@@ -177,19 +177,30 @@ document.addEventListener("DOMContentLoaded", () => {
   });
 
   // ---------- Delete buttons ----------
-
   document.querySelectorAll(".table-btn-delete").forEach((btn) => {
     btn.addEventListener("click", () => {
-      const code = btn.dataset.id;
+      const code = btn.dataset.id;  // Get class code from data-id
       if (!confirm(`Are you sure you want to delete class ${code}? This cannot be undone.`)) {
         return;
       }
 
-      // Simple POST form to delete route
+      // Log to check if the code is correct
+      console.log("Deleting class:", code);
+
+      // Create the form and append it to the body
       const f = document.createElement("form");
       f.method = "POST";
       f.action = `/admin/classes/${encodeURIComponent(code)}/delete`;  // Correct URL format
-      f.submit();
+      document.body.appendChild(f);
+
+      // Log to confirm the form is being created
+      console.log("Form created, submitting...");
+
+      // Submit the form
+      setTimeout(() => {
+        f.submit();
+        console.log("Form submitted");
+      }, 0);
     });
   });
 });
