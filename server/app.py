@@ -4563,7 +4563,7 @@ def api_infer():
     )
 
 # -------------------- API: Identify (single face) --------------------
-@app.post("/api/identify", methods=["POST"])
+@app.post("/api/identify")
 def api_identify():
     print("=== IDENTIFY DEBUG ===")
     print("content_type:", request.content_type)
