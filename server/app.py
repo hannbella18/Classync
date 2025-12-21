@@ -4543,6 +4543,7 @@ def api_infer():
 
     det = get_detector()
     dets = det.predict_states(img)
+    print("INFER dets:", dets)
 
     if not dets:
         return jsonify({"ok": True, "state": "Unknown", "state_score": 0.0, "bbox": None})
