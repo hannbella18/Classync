@@ -4535,54 +4535,74 @@ def api_infer():
     f = request.files.get("frame")
     if not f:
         return jsonify({"ok": False, "error": "no frame"}), 400
+
     file_bytes = np.frombuffer(f.read(), np.uint8)
     img = cv2.imdecode(file_bytes, cv2.IMREAD_COLOR)
+    if img is None:
+        return jsonify({"ok": False, "error": "bad image"}), 400
 
     det = get_detector()
     dets = det.predict_states(img)
-    if not dets:
-        return jsonify(
-            {"ok": True, "state": "Unknown", "state_score": 0.0, "bbox": None}
-        )
 
-    # Prefer Drowsy if its score is close to Awake (more realistic behavior)
-    drowsy = None
-    awake = None
+    if not dets:
+        return jsonify({"ok": True, "state": "Unknown", "state_score": 0.0, "bbox": None})
+
+    # --- normalize to list ---
+    if isinstance(dets, dict):
+        dets = [dets]
+
+    def to_bucket(label: str) -> str:
+        s = (label or "").strip().lower()
+        # map many possible model outputs -> Drowsy
+        if ("drow" in s) or ("sleep" in s) or ("yawn" in s) or ("close" in s) or ("fatigue" in s) or ("tired" in s):
+            return "Drowsy"
+        if ("awake" in s) or ("alert" in s) or ("normal" in s) or ("open" in s):
+            return "Awake"
+        return "Unknown"
+
+    # find best Awake / Drowsy candidate (by score)
+    best_awake = None
+    best_drowsy = None
+    best_any = None
 
     for d in dets:
-        lab = (d.get("label") or "").strip().lower()
-        if lab in ("drowsy", "sleepy"):
-            if (drowsy is None) or (d["score"] > drowsy["score"]):
-                drowsy = d
-        if lab in ("awake", "alert"):
-            if (awake is None) or (d["score"] > awake["score"]):
-                awake = d
+        if "score" not in d:
+            continue
+        if best_any is None or d["score"] > best_any["score"]:
+            best_any = d
 
-    DROWSY_MIN = 0.70
-    MARGIN = 0.05  # if drowsy is within 0.05 of awake, show drowsy
+        bucket = to_bucket(d.get("label", ""))
+        if bucket == "Awake":
+            if best_awake is None or d["score"] > best_awake["score"]:
+                best_awake = d
+        elif bucket == "Drowsy":
+            if best_drowsy is None or d["score"] > best_drowsy["score"]:
+                best_drowsy = d
 
-    if drowsy and drowsy["score"] >= DROWSY_MIN and (
-        (awake is None) or (drowsy["score"] >= awake["score"] - MARGIN)
-    ):
-        best = drowsy
-    else:
-        best = max(dets, key=lambda d: d["score"])
+    if best_any is None:
+        return jsonify({"ok": True, "state": "Unknown", "state_score": 0.0, "bbox": None})
 
-        x1, y1, x2, y2 = best["xyxy"]
+    # --- decision rules ---
+    # Make Drowsy easier to show (because models often bias to Awake)
+    DROWSY_MIN = 0.55
+    MARGIN = 0.08  # if drowsy is close to awake, prefer drowsy
 
-    return jsonify(
-        {
-            "ok": True,
-            "state": best["label"],
-            "state_score": float(best["score"]),
-            "bbox": {
-                "x": int(x1),
-                "y": int(y1),
-                "w": int(x2 - x1),
-                "h": int(y2 - y1),
-            },
-        }
-    )
+    chosen = best_any
+    if best_drowsy and best_drowsy["score"] >= DROWSY_MIN:
+        if (best_awake is None) or (best_drowsy["score"] >= best_awake["score"] - MARGIN):
+            chosen = best_drowsy
+
+    # bbox safely (some models might not return xyxy)
+    bbox = None
+    if chosen.get("xyxy") and len(chosen["xyxy"]) == 4:
+        x1, y1, x2, y2 = chosen["xyxy"]
+        bbox = {"x": int(x1), "y": int(y1), "w": int(x2 - x1), "h": int(y2 - y1)}
+
+    # output normalized state label
+    state = to_bucket(chosen.get("label", ""))
+    score = float(chosen.get("score", 0.0))
+
+    return jsonify({"ok": True, "state": state, "state_score": score, "bbox": bbox})
 
 # -------------------- API: Identify (single face) --------------------
 @app.post("/api/identify")

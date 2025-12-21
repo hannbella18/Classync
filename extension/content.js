@@ -660,7 +660,8 @@ async function handleFrameBlob(blob) {
         if (typeof state === "string") {
           const s = state.trim().toLowerCase();
           if (s === "awake" || s === "alert") state = "Awake";
-          else if (s === "drowsy" || s === "sleepy") state = "Drowsy";
+          else if (s.includes("drow") || s.includes("sleep") || s.includes("yawn") || s.includes("close") || s.includes("tired"))
+          state = "Drowsy";
           else if (s === "unknown" || s === "") state = "Unknown";
           else state = state.trim();
         }
