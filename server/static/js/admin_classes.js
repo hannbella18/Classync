@@ -188,8 +188,7 @@ document.addEventListener("DOMContentLoaded", () => {
       // Simple POST form to delete route
       const f = document.createElement("form");
       f.method = "POST";
-      f.action = `/admin/delete-class/${encodeURIComponent(code)}`;
-      document.body.appendChild(f);
+      f.action = `/admin/classes/${encodeURIComponent(code)}/delete`;  // Correct URL format
       f.submit();
     });
   });
