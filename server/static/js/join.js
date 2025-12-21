@@ -164,7 +164,7 @@ document.addEventListener("DOMContentLoaded", () => {
       } catch (err) {
         console.error("[join] identify error:", err);
       }
-    }, 700); // Fast interval (0.7s)
+    }, 1500); // Fast interval (0.7s)
   }
 
   startCamera();
