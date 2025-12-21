@@ -4545,8 +4545,30 @@ def api_infer():
             {"ok": True, "state": "Unknown", "state_score": 0.0, "bbox": None}
         )
 
-    best = max(dets, key=lambda d: d["score"])
-    x1, y1, x2, y2 = best["xyxy"]
+    # Prefer Drowsy if its score is close to Awake (more realistic behavior)
+    drowsy = None
+    awake = None
+
+    for d in dets:
+        lab = (d.get("label") or "").strip().lower()
+        if lab in ("drowsy", "sleepy"):
+            if (drowsy is None) or (d["score"] > drowsy["score"]):
+                drowsy = d
+        if lab in ("awake", "alert"):
+            if (awake is None) or (d["score"] > awake["score"]):
+                awake = d
+
+    DROWSY_MIN = 0.70
+    MARGIN = 0.05  # if drowsy is within 0.05 of awake, show drowsy
+
+    if drowsy and drowsy["score"] >= DROWSY_MIN and (
+        (awake is None) or (drowsy["score"] >= awake["score"] - MARGIN)
+    ):
+        best = drowsy
+    else:
+        best = max(dets, key=lambda d: d["score"])
+
+        x1, y1, x2, y2 = best["xyxy"]
 
     return jsonify(
         {
