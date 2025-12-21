@@ -1,0 +1,31 @@
+{
+  "manifest_version": 3,
+  "name": "Classync Meet Detector",
+  "version": "0.1.0",
+  "description": "Capture Meet frames -> backend infer -> post events",
+  "permissions": ["storage", "activeTab", "scripting"],
+  "host_permissions": [
+    "https://meet.google.com/*",
+    "http://localhost:5001/*",
+    "http://127.0.0.1:5001/*",
+    "https://hannbella-classync.hf.space/*",
+    "https://*.ngrok-free.app/*",
+    "https://*.ngrok-free.dev/*"  
+  ],
+  "background": { "service_worker": "background.js" },
+  "content_scripts": [
+    {
+      "matches": ["https://meet.google.com/*"],
+      "js": ["config.js", "content.js"],
+      "css": ["overlay.css"],
+      "run_at": "document_idle"
+    },
+
+    {
+      "matches": ["http://localhost:5001/*"],
+      "js": ["status_ping_content.js"],
+      "run_at": "document_start"
+    }
+  ],
+  "action": { "default_title": "Classync (FYP)" }
+}

@@ -1,0 +1,411 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <title>Classync – Dashboard</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+
+  <!-- Poppins font -->
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link
+    href="https://fonts.googleapis.com/css2?family=Poppins:wght@300;400;500;600;700&display=swap"
+    rel="stylesheet"
+  />
+
+  <link rel="stylesheet"
+        href="{{ url_for('static', filename='css/dashboard_main.css') }}">
+</head>
+<body>
+
+<div class="app-wrapper">
+  <!-- ========== SIDEBAR ========== -->
+  <aside class="sidebar">
+    <div class="sidebar-header">
+      <button class="logo-btn" id="sidebarToggle" aria-label="Toggle sidebar">
+        <div class="logo-mark">C</div>
+        <span class="logo-text classync-brand">Classync</span>
+      </button>
+    </div>
+
+    <nav class="sidebar-menu">
+      <a href="{{ url_for('dashboard') }}" class="menu-item active">
+        <span class="menu-icon">🏠</span>
+        <span class="menu-label">Dashboard</span>
+      </a>
+      <a href="{{ url_for('courses') }}" class="menu-item">
+        <span class="menu-icon">📚</span>
+        <span class="menu-label">Courses</span>
+      </a>
+      <a href="{{ url_for('lecturer_analysis') }}" class="menu-item">
+        <span class="menu-icon">📊</span>
+        <span class="menu-label">Analysis</span>
+      </a>
+    </nav>
+
+    <div class="sidebar-bottom">
+      <a href="{{ url_for('lecturer_settings') }}" class="menu-item">
+        <span class="menu-icon">⚙️</span>
+        <span class="menu-label">Settings</span>
+      </a>
+    </div>
+  </aside>
+
+  <!-- ========== MAIN AREA ========== -->
+  <div class="main-wrap">
+    <!-- Top navbar -->
+    <header class="topbar">
+      <div class="topbar-center">
+        <h1 class="page-title">Dashboard</h1>
+      </div>
+
+      <div class="topbar-right">
+        <button id="notifToggle" class="icon-btn" aria-label="Notifications">
+          🔔
+        </button>
+
+        <div class="user-info">
+          <div class="avatar">
+            {{ current_user.initials if current_user else 'CS' }}
+          </div>
+          <div class="user-text">
+            <div class="user-name">
+              {{ current_user.name if current_user else 'Charles Santos' }}
+            </div>
+            <div class="user-role">
+              Lecturer
+            </div>
+          </div>
+        </div>
+
+        <a href="{{ url_for('logout') }}" class="icon-btn" aria-label="Logout">
+          ⏻
+        </a>
+      </div>
+    </header>
+
+    <!-- ========== CONTENT ========== -->
+    <main class="dashboard-content">
+      <section class="dashboard-grid">
+
+        <!-- HERO – spans 2 columns, top row -->
+        <section class="card hero-card">
+          <div class="hero-text">
+            <div class="hero-greeting">Welcome back,</div>
+            <h2 class="hero-name">
+              {{ current_user.name if current_user else 'Charles Santos' }}
+            </h2>
+            <p class="hero-subtext">
+              Here’s a quick summary of your classes.
+            </p>
+          </div>
+
+          <div class="hero-illustration">
+                <img 
+                    src="{{ url_for('static', filename='img/hero_image.png') }}" 
+                    alt="Hero Illustration"
+                    class="hero-img"
+                >
+          </div>
+        </section>
+
+        <!-- Engagement Overview – full row of 4 KPI cards (same width as hero) -->
+        <section class="card engagement-card">
+          <div class="engagement-header">
+            <div>
+              <h2>Engagement Overview</h2>
+              <span class="card-subtitle">Snapshot for this week</span>
+            </div>
+          </div>
+
+          <div class="engagement-kpi-row">
+            <!-- Card 1 -->
+            <div class="kpi-card kpi-card--good">
+              <div class="kpi-label">Avg. engagement</div>
+              <div class="kpi-main">{{ overview.avg_engagement }}%</div>
+              <div class="kpi-sub">Across all classes</div>
+              <div class="kpi-change kpi-change--{{ trend.avg.dir }}">
+                <span class="arrow">
+                  {% if trend.avg.dir == 'up' %}▲
+                  {% elif trend.avg.dir == 'down' %}▼
+                  {% else %}■{% endif %}
+                </span>
+                <span>{{ trend.avg.text }}</span>
+              </div>
+            </div>
+
+            <!-- Card 2 -->
+            <div class="kpi-card kpi-card--good">
+              <div class="kpi-label">Camera on</div>
+              <div class="kpi-main">{{ overview.camera_on }}%</div>
+              <div class="kpi-sub">Students with camera enabled</div>
+              <div class="kpi-change kpi-change--{{ trend.camera.dir }}">
+                <span class="arrow">
+                  {% if trend.camera.dir == 'up' %}▲
+                  {% elif trend.camera.dir == 'down' %}▼
+                  {% else %}■{% endif %}
+                </span>
+                <span>{{ trend.camera.text }}</span>
+              </div>
+            </div>
+
+            <!-- Card 3 -->
+            <div class="kpi-card kpi-card--bad">
+              <div class="kpi-label">Absent rate</div>
+              <div class="kpi-main">{{ overview.absent_rate }}%</div>
+              <div class="kpi-sub">All registered students</div>
+              <div class="kpi-change kpi-change--{{ trend.absent.dir }}">
+                <span class="arrow">
+                  {% if trend.absent.dir == 'up' %}▲
+                  {% elif trend.absent.dir == 'down' %}▼
+                  {% else %}■{% endif %}
+                </span>
+                <span>{{ trend.absent.text }}</span>
+              </div>
+            </div>
+
+            <!-- Card 4 -->
+            <div class="kpi-card kpi-card--bad">
+              <div class="kpi-label">At-risk students</div>
+              <div class="kpi-main">{{ overview.at_risk }}</div>
+              <div class="kpi-sub">Below 80% attendance</div>
+              <div class="kpi-change kpi-change--{{ trend.risk.dir }}">
+                <span class="arrow">
+                  {% if trend.risk.dir == 'up' %}▲
+                  {% elif trend.risk.dir == 'down' %}▼
+                  {% else %}■{% endif %}
+                </span>
+                <span>{{ trend.risk.text }}</span>
+              </div>
+            </div>
+          </div>
+        </section>
+
+        <!-- CALENDAR + UPCOMING – full right column, all rows -->
+        <section class="card big-right-card calendar-card">
+          <!-- Calendar block -->
+          <div class="right-card-section upcoming-section">
+            <header class="card-header card-header-row">
+              <div>
+                <h2 id="monthLabel">March</h2>
+                <span class="card-subtitle" id="weekdayLabel">Monday</span>
+              </div>
+              <button class="text-link small" id="todayButton">Today</button>
+            </header>
+
+            <!-- JS generates real calendar here -->
+            <div class="calendar-grid" id="calendarGrid"></div>
+
+            <p class="calendar-note">
+              Click a date to see classes scheduled for that day.
+            </p>
+          </div>
+
+          <hr class="right-card-divider" />
+
+          <!-- Upcoming class block -->
+          <div class="right-card-section">
+            <header class="card-header">
+              <h2>Upcoming date classes</h2>
+              <span class="card-subtitle" id="currentDateText">
+                Current date:
+              </span>
+            </header>
+
+            <div class="upcoming-class" id="upcomingCard">
+              <div class="upcoming-tag" id="upcomingTag">Next class</div>
+
+              <div class="upcoming-title" id="upcomingClassTitle">
+                CSC4900 – Final Year Project
+              </div>
+
+              <div class="upcoming-meta" id="upcomingClassMeta">
+                10:00 AM – 12:00 PM · Google Meet
+              </div>
+              
+              <!-- NEW: other classes on the same day -->
+              <ul class="upcoming-extra-list" id="upcomingExtraList"></ul>
+
+            </div>
+          </div>
+        </section>
+
+        <!-- Your Recent Class – left column, row under hero -->
+        <section class="card recent-card">
+          <header class="card-header">
+            <h2>Your Recent Class</h2>
+            <span class="card-subtitle">Showing latest 3 classes</span>
+          </header>
+          <table class="simple-table">
+            <thead>
+            <tr>
+              <th>No.</th>
+              <th>Meet link</th>
+              <th>Class</th>
+            </tr>
+            </thead>
+            <tbody>
+              {% if classes %}
+                {# show only latest 3 classes #}
+                {% for c in classes[:3] %}
+                  <tr>
+                    <td>{{ loop.index }}.</td>
+                    <td>
+                      {% if c["platform_link"] %}
+                        <a href="{{ c["platform_link"] }}" target="_blank">
+                          {{ c["platform_link"] }}
+                        </a>
+                      {% else %}
+                        <span>-</span>
+                      {% endif %}
+                    </td>
+                    <td>{{ c["id"] }}</td>
+                  </tr>
+                {% endfor %}
+              {% else %}
+                  <tr>
+                    <td colspan="3" style="padding: 0.75rem; color: #9CA3AF; font-size: 0.875rem;">
+                      No classes found yet.
+                    </td>
+                  </tr>
+              {% endif %}
+            </tbody>
+
+          </table>
+        </section>
+
+        <!-- Alerts – middle column, same row as Recent -->
+        <section class="card alerts-card">
+          <header class="card-header alerts-header">
+            <h2>Alerts</h2>
+            <span class="alerts-count">
+              {{ alerts|length }} active
+            </span>
+          </header>
+
+          <ul class="alerts-list">
+            {% for a in alerts %}
+            <li class="alert-row alert-{{ a.level }}">
+              <div class="alert-dot"></div>
+
+              <div class="alert-main">
+                <div class="alert-top">
+                  <span class="alert-class">{{ a.course }}</span>
+                  <span class="alert-badge">{{ a.level|capitalize }}</span>
+                </div>
+
+                <p class="alert-text">
+                  {{ a.message }}
+                </p>
+
+                {% if a.note %}
+                <p class="alert-note">{{ a.note }}</p>
+                {% endif %}
+              </div>
+            </li>
+            {% endfor %}
+          </ul>
+        </section>
+
+        <!-- Overall Attendance – left column, bottom row -->
+        <section class="card attendance-card">
+          <header class="card-header">
+            <h2>Overall Attendance Summary</h2>
+          </header>
+
+          <div class="attendance-summary">
+            <div class="circle-stat">
+              <div class="circle-ring" id="attendanceRing">
+                <div class="circle-inner">
+                  <div class="circle-value" id="attendanceValue">95%</div>
+                  <div class="circle-label" id="attendanceLabel">Present</div>
+                </div>
+              </div>
+            </div>
+
+            <ul class="legend-list" id="attendanceLegend">
+              <li class="legend-item active" data-type="present">
+                <span class="dot dot-present"></span>Present
+              </li>
+              <li class="legend-item" data-type="absent">
+                <span class="dot dot-absent"></span>Absent
+              </li>
+              <li class="legend-item" data-type="late">
+                <span class="dot dot-late"></span>Late
+              </li>
+            </ul>
+          </div>
+        </section>
+
+        <section class="card engagement2-card">
+          <header class="card-header">
+            <h2>Average Engagement by Course</h2>
+            <span class="card-subtitle">Weekly overview</span>
+          </header>
+
+          <div class="bar-chart">
+            {% if course_engagement %}
+              {% for c in course_engagement %}
+              <div class="bar-item">
+                <span class="bar-label">{{ c.id }}</span>
+                <div class="bar-track">
+                  <div class="bar-fill" style="width: {{ c.percent }}%;"></div>
+                </div>
+                <span class="bar-value">{{ c.percent }}%</span>
+              </div>
+              {% endfor %}
+            {% else %}
+              <p style="font-size: 0.875rem; color:#9CA3AF; padding:0.5rem 0;">
+                No engagement data yet. End at least one session to see results.
+              </p>
+            {% endif %}
+          </div>
+        </section>
+
+      </section>
+    </main>
+
+    <!-- ========== NOTIFICATION POPUP ========== -->
+    <aside id="notifPanel" class="notif-panel" aria-hidden="true">
+      <header class="notif-header">
+        <h3>Notifications</h3>
+        <button id="notifClearBtn" class="text-link small">Clear all</button>
+      </header>
+      <ul class="notif-list">
+        {% if notifications %}
+          {% for n in notifications %}
+            <li class="notif-item">
+              <span class="notif-dot {{ n.level }}"></span>
+
+              <div class="notif-main">
+                {% if n.type %}
+                  <span class="notif-tag">
+                    {{ n.type.replace('_', ' ')|title }}
+                  </span>
+                {% endif %}
+                <span class="notif-message">{{ n.message }}</span>
+                <span class="notif-time">
+                  {{ n.created_at[11:16] if n.created_at }}
+                </span>
+              </div>
+            </li>
+
+          {% endfor %}
+        {% else %}
+          <li>No notifications yet.</li>
+        {% endif %}
+      </ul>
+      <footer class="notif-footer">
+        <button class="text-link small">View all</button>
+      </footer>
+    </aside>
+  </div>
+</div>
+
+<script>
+  window.ATTENDANCE_DATA_FROM_SERVER = {{ attendance_data | tojson | safe }}; 
+  window.COURSE_SCHEDULE = {{ schedule_by_day | tojson | safe }};
+</script>
+<script src="{{ url_for('static', filename='js/dashboard_main.js') }}"></script>
+</body>
+</html>

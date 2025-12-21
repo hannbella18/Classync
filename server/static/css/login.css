@@ -1,0 +1,211 @@
+/* Global */
+body {
+    margin: 0;
+    padding: 0;
+    font-family: "Poppins", sans-serif;
+    background: #ffffff;
+    overflow-x: hidden;
+}
+
+.login-wrapper {
+    height: 100vh;
+}
+
+/* LEFT PANEL */
+.left-panel {
+    position: relative;
+    overflow: hidden;
+    background: linear-gradient(135deg, #e9f1ff, #ffffff);
+}
+
+/* Animated Abstract Shapes */
+.shape {
+    position: absolute;
+    border-radius: 50%;
+    filter: blur(45px);
+    animation: floatShape 8s ease-in-out infinite;
+}
+
+.shape-1 {
+    width: 380px;
+    height: 380px;
+    background: rgba(21, 101, 192, 0.25);
+    top: -50px;
+    left: -40px;
+    animation-delay: 0s;
+}
+
+.shape-2 {
+    width: 300px;
+    height: 300px;
+    background: rgba(100, 156, 255, 0.23);
+    top: 250px;
+    left: 100px;
+    animation-delay: 1s;
+}
+
+.shape-3 {
+    width: 480px;
+    height: 480px;
+    background: rgba(140, 180, 255, 0.18);
+    bottom: -100px;
+    right: -60px;
+    animation-delay: 2s;
+}
+
+@keyframes floatShape {
+    0%, 100% { transform: translateY(0px); }
+    50%      { transform: translateY(-25px); }
+}
+
+/* Illustration Box (Floating) */
+.illustration-box {
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -50%);
+    background: #ffffffc9;
+    padding: 40px 50px;
+    border-radius: 25px;
+    box-shadow: 0px 18px 35px rgba(0,0,0,0.08);
+    backdrop-filter: blur(15px);
+    z-index: 20;
+    animation: floatIllust 4.5s ease-in-out infinite;
+}
+
+.illustration {
+    width: 380px;
+}
+
+@keyframes floatIllust {
+    0%,100% { transform: translate(-50%, -50%) translateY(0); }
+    50%     { transform: translate(-50%, -50%) translateY(-18px); }
+}
+
+/* RIGHT PANEL */
+.form-wrapper {
+    width: 80%;
+    max-width: 430px;
+}
+
+.brand-title {
+    font-size: 38px;
+    font-weight: 700;
+    color: #1565C0;
+}
+
+.subtitle {
+    margin-bottom: 25px;
+    font-size: 18px;
+    font-weight: 500;
+    color: #444;
+}
+
+/* Form */
+.form-control {
+    padding: 14px;
+    border-radius: 12px;
+    border: 1px solid #dcdcdc;
+    font-size: 15px;
+}
+
+.form-control:focus {
+    border-color: #1565C0;
+    box-shadow: 0 0 0 0.15rem rgba(21, 101, 192, 0.25);
+}
+
+/* Button */
+.login-btn {
+    background: linear-gradient(135deg, #1565C0 0%, #1e7af5 100%);
+    color: white;
+    padding: 14px;
+    font-size: 18px;
+    border-radius: 12px;
+    border: none;
+    transition: 0.2s;
+}
+
+.login-btn:hover {
+    background: linear-gradient(135deg, #0e47a1, #1565C0);
+}
+
+/* Links */
+.forgot-link,
+.signup-text a {
+    color: #1565C0;
+    font-weight: 500;
+    text-decoration: none;
+}
+
+.forgot-link:hover,
+.signup-text a:hover {
+    text-decoration: underline;
+}
+
+/* Responsive */
+@media (max-width: 768px) {
+    .left-panel { display: none; }
+    .right-panel { padding: 40px; }
+}
+
+/* Small floating particles */
+#particles .particle {
+    position: fixed;
+    width: 6px;
+    height: 6px;
+    background: rgba(21, 101, 192, 0.18);
+    border-radius: 50%;
+    animation: floatParticle linear infinite;
+    z-index: 1;
+}
+
+/* ===== Password eye icon (login) ===== */
+
+.password-wrapper {
+    position: relative;
+    display: flex;
+    align-items: center;
+    margin-bottom: 6px;  /* ✅ smaller gap */
+}
+
+.password-wrapper .form-control {
+    padding-right: 40px; /* space for eye icon */
+}
+
+.pw-icon {
+    position: absolute;
+    right: 14px;
+    width: 16px;
+    height: 16px;
+    cursor: pointer;
+    opacity: 0.8;
+}
+
+.pw-icon:hover {
+    opacity: 1;
+}
+
+/* Forgot password alignment */
+.forgot-row {
+    display: flex;
+    justify-content: flex-end;
+    margin-top: 2px;
+    margin-bottom: 14px; /* ✅ space before Sign In button */
+}
+
+.forgot-link {
+    font-size: 13px;
+    color: #1565C0;
+    text-decoration: none;
+    font-weight: 500;
+}
+
+.forgot-link:hover {
+    text-decoration: underline;
+}
+
+@keyframes floatParticle {
+    0% { transform: translateY(0px); opacity: 1; }
+    100% { transform: translateY(-60px); opacity: 0; }
+}
+

@@ -1,0 +1,109 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Classync Login</title>
+
+    <!-- Bootstrap -->
+    <link rel="stylesheet" href="{{ url_for('static', filename='bootstrap/css/bootstrap.min.css') }}">
+
+    <!-- Custom CSS -->
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/login.css') }}">
+
+    <!-- Google Fonts -->
+    <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+</head>
+
+<body>
+
+<div id="particles"></div>
+
+<div class="login-wrapper container-fluid">
+    <div class="row h-100">
+
+        <!-- LEFT SIDE -->
+        <div class="col-lg-6 col-md-6 left-panel">
+
+            <!-- Animated Abstract Shapes -->
+            <div class="shape shape-1"></div>
+            <div class="shape shape-2"></div>
+            <div class="shape shape-3"></div>
+
+            <!-- Floating Illustration -->
+            <div class="illustration-box" id="parallax">
+                <img src="{{ url_for('static', filename='img/4.png') }}" class="illustration">
+            </div>
+
+        </div>
+
+        <!-- RIGHT SIDE -->
+        <div class="col-lg-6 col-md-6 right-panel d-flex align-items-center justify-content-center">
+
+            <div class="form-wrapper">
+
+                <h1 class="brand-title">Sign In</h1>
+                <p class="subtitle">Welcome to Classync</p>
+
+                {% if error %}
+                    <div class="alert alert-danger py-2 px-3 mb-3" style="font-size: 0.85rem;">
+                        {{ error }}
+                    </div>
+                {% endif %}
+
+                <form action="{{ url_for('login') }}" method="POST">
+
+                    <div class="form-group mb-3">
+                        <label>Email</label>
+                        <input type="email" name="email" class="form-control form-control-lg" placeholder="Enter your email" required>
+                    </div>
+
+                    <div class="form-group mb-3">
+                        <label>Password</label>
+
+                        <div class="password-wrapper">
+                            <input
+                                type="password"
+                                id="login_password"
+                                name="password"
+                                class="form-control input-classync"
+                                placeholder="Enter your password"
+                                required
+                            >
+                            <img
+                                src="{{ url_for('static', filename='img/closed-password.png') }}"
+                                class="pw-icon login-pw-icon"
+                                data-target="login_password"
+                                data-open="{{ url_for('static', filename='img/open-password.png') }}"
+                                data-closed="{{ url_for('static', filename='img/closed-password.png') }}"
+                                alt="toggle password visibility"
+                            >
+                        </div>
+                        <div class="forgot-row">
+                            <a href="{{ url_for('forgot_password') }}" class="forgot-link">
+                                Forgot password?
+                            </a>
+                        </div>
+                        
+                    <button type="submit" class="btn login-btn w-100">Sign In</button>
+
+                    <p class="signup-text text-center mt-3">
+                        Don’t have an account? <a href="/signup">Sign Up</a>
+                    </p>
+
+                </form>
+
+            </div>
+
+        </div>
+
+    </div>
+</div>
+
+<!-- Bootstrap JS -->
+<script src="{{ url_for('static', filename='bootstrap/js/bootstrap.min.js') }}"></script>
+<!-- WOW JS -->
+<script src="{{ url_for('static', filename='js/login.js') }}"></script>
+
+</body>
+</html>

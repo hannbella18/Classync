@@ -1,0 +1,133 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Classync | Sign Up</title>
+
+    <!-- Bootstrap -->
+    <link rel="stylesheet" href="{{ url_for('static', filename='bootstrap/css/bootstrap.min.css') }}">
+    <!-- Custom CSS -->
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/signup.css') }}">
+
+    <!-- FONT -->
+    <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+</head>
+
+<body>
+
+<div id="particles"></div>
+
+<div class="signup-wrapper container-fluid">
+    <div class="row h-100">
+
+        <!-- LEFT PANEL -->
+        <div class="col-lg-6 col-md-6 left-panel">
+            <div class="shape shape-1"></div>
+            <div class="shape shape-2"></div>
+            <div class="shape shape-3"></div>
+
+            <div class="illustration-box" id="parallax">
+                <img src="{{ url_for('static', filename='img/5.png') }}" class="illustration">
+            </div>
+        </div>
+
+        <!-- RIGHT PANEL -->
+        <div class="col-lg-6 col-md-6 right-panel d-flex align-items-center justify-content-center">
+
+            <div class="form-wrapper">
+
+                <h1 class="brand-title mb-1">Sign Up</h1>
+                <p class="signup-subtitle">Join Classync today!</p>
+
+                {% if success %}
+                <div class="signup-popup-backdrop" id="signupSuccess">
+                <div class="signup-popup-card">
+                    <h2 class="signup-popup-title">Account Created 🎉</h2>
+                    <p class="signup-popup-text">
+                    Your account has been created successfully.<br>
+                    You can now log in to Classync.
+                    </p>
+                    <button type="button"
+                            class="btn signup-popup-btn"
+                            onclick="window.location.href='/login';">
+                        Go to Login
+                    </button>
+                </div>
+                </div>
+                {% endif %}
+
+                <form id="signup-form" method="POST" action="/signup">
+
+                    <!-- Full Name -->
+                    <div class="form-group mb-3">
+                        <label>Full Name</label>
+                        <input id="su_name" name="name" type="text"
+                            class="form-control input-classync"
+                            placeholder="Enter your full name"
+                            required>
+                    </div>
+
+                    <!-- Email -->
+                    <div class="form-group mb-3">
+                        <label>Email</label>
+                        <input id="su_email" name="email" type="email"
+                            class="form-control input-classync"
+                            placeholder="Enter your email"
+                            required>
+                    </div>
+
+                    <!-- Password -->
+                    <div class="form-group mb-3">
+                        <label>Password</label>
+                        <div class="password-wrapper">
+                            <input type="password" id="password" name="password"
+                                class="form-control input-box"
+                                placeholder="Create a password"
+                                required>
+                            <img src="{{ url_for('static', filename='img/closed-password.png') }}"
+                                class="pw-icon"
+                                data-target="password"
+                                data-open="{{ url_for('static', filename='img/open-password.png') }}"
+                                data-closed="{{ url_for('static', filename='img/closed-password.png') }}">
+                        </div>
+                        <p class="pw-hint">
+                            Use 8–14 characters, including uppercase, lowercase, number & symbol.
+                        </p>
+                    </div>
+
+                    <!-- Confirm Password -->
+                    <div class="form-group mb-3">
+                        <label>Confirm Password</label>
+                        <div class="password-wrapper">
+                            <input type="password" id="confirm_password" name="confirm_password"
+                                class="form-control input-box"
+                                placeholder="Confirm your password"
+                                required>
+                            <img src="{{ url_for('static', filename='img/closed-password.png') }}"
+                                class="pw-icon"
+                                data-target="confirm_password"
+                                data-open="{{ url_for('static', filename='img/open-password.png') }}"
+                                data-closed="{{ url_for('static', filename='img/closed-password.png') }}">
+                        </div>
+                    </div>
+
+                    <button type="submit" id="su_save"
+                            class="btn signup-btn w-100 mt-2">
+                        Sign Up
+                    </button>
+
+                    <p class="signup-text text-center mt-3">
+                        Already have an account? <a href="/login">Sign In</a>
+                    </p>
+                </form>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script src="{{ url_for('static', filename='bootstrap/js/bootstrap.min.js') }}"></script>
+<script src="{{ url_for('static', filename='js/signup.js') }}"></script>
+
+</body>
+</html>

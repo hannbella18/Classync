@@ -1,0 +1,558 @@
+/* ===== Summary page layout tweaks ===== */
+
+.summary-page {
+  display: flex;
+  flex-direction: column;
+  gap: 1.75rem;
+}
+
+/* Hero card */
+
+.summary-hero-card {
+  padding: 1.75rem 2rem;
+  display: flex;
+  flex-direction: column;
+  gap: 1.5rem;
+}
+
+.summary-hero-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+}
+
+.summary-eyebrow {
+  font-size: 0.75rem;
+  text-transform: uppercase;
+  letter-spacing: 0.12em;
+  color: #9CA3AF;
+  font-weight: 600;
+}
+
+.summary-hero-title {
+  margin: 0.15rem 0 0.35rem;
+  font-size: 1.35rem;
+  font-weight: 600;
+  color: #111827;
+}
+
+.summary-hero-sub {
+  margin: 0;
+  font-size: 0.9rem;
+  color: #6B7280;
+}
+
+.summary-stats-row {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 1.25rem;
+}
+
+.summary-stat {
+  background: linear-gradient(135deg, #014DB3, #6F8CFD);
+  color: #fff;
+  border-radius: 1.25rem;
+  padding: 1rem 1.25rem;
+  box-shadow: 0 18px 40px rgba(15, 23, 42, 0.25);
+}
+
+.summary-stat-label {
+  font-size: 0.8rem;
+  opacity: 0.9;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+}
+
+.summary-stat-value {
+  margin-top: 0.5rem;
+  font-size: 1.8rem;
+  font-weight: 700;
+}
+
+.summary-stat-caption {
+  margin-top: 0.35rem;
+  font-size: 0.8rem;
+  opacity: 0.9;
+}
+
+/* ===== Student join link (3 horizontal lines) ===== */
+
+.summary-join-row {
+  margin-top: 1.25rem;
+  padding-top: 1.25rem;
+  border-top: 1px solid rgba(15, 23, 42, 0.08);
+
+  display: flex;
+  flex-direction: column;  /* 3 lines stacked */
+  gap: 0.5rem;
+}
+
+/* LINE 1 */
+.summary-join-label {
+  font-size: 0.82rem;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.07em;
+  color: #374151;
+  white-space: nowrap;      /* <-- keep on ONE line */
+}
+
+/* LINE 2 */
+.summary-join-caption {
+  font-size: 0.88rem;
+  color: #6b7280;
+  white-space: nowrap;      /* <-- keep on ONE line */
+}
+
+/* LINE 3 */
+.summary-join-actions {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+}
+
+.summary-join-input {
+  flex: 1;
+  min-width: 260px;
+  max-width: 450px;
+  padding: 0.5rem 0.9rem;
+  border-radius: 999px;
+  border: 1px solid #e5e7eb;
+  background: #f9fafb;
+  font-size: 0.88rem;
+  text-overflow: ellipsis;
+  overflow: hidden;
+  white-space: nowrap;
+}
+
+.summary-join-copy-btn {
+  white-space: nowrap;
+  padding: 0.55rem 1.2rem;
+}
+
+/* Allow wrapping on smaller screens so it doesn't overflow */
+@media (max-width: 900px) {
+  .summary-join-caption {
+    white-space: normal;
+  }
+
+  .summary-join-actions {
+    flex-direction: column;
+    align-items: flex-start;
+    width: 100%;
+  }
+
+  .summary-join-input {
+    width: 100%;
+    max-width: 100%;
+  }
+}
+
+/* Session controls row */
+
+.summary-controls {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 1rem;
+  padding: 0.75rem 0.25rem;
+  margin: 1.5rem 0;
+}
+
+.summary-control-group {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+}
+
+.summary-control-group label {
+  font-size: 0.85rem;
+  font-weight: 500;
+  color: #6B7280;
+}
+
+.summary-select {
+  min-width: 210px;
+  padding: 0.55rem 0.9rem;
+  border-radius: 999px;
+  border: 1px solid #E5E7EB;
+  background: #fff;
+  font-size: 0.9rem;
+  outline: none;
+}
+
+.summary-control-actions {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+}
+
+/* Buttons */
+
+.btn-primary {
+  background: #014DB3;
+  color: #fff;
+  border: none;
+  border-radius: 999px;
+  padding: 0.45rem 1.6rem;
+  font-size: 0.9rem;
+  font-weight: 500;
+  cursor: pointer;
+  transition: 0.15s;
+  box-shadow: 0 8px 22px rgba(1, 77, 179, 0.35);
+}
+
+.btn-primary:hover {
+  transform: translateY(-1px);
+  box-shadow: 0 10px 26px rgba(1, 77, 179, 0.4);
+}
+
+.btn-outline {
+  border-radius: 999px;
+  padding: 0.4rem 1.2rem;
+  font-size: 0.85rem;
+  border: 1px solid #D1D5DB;
+  background: #fff;
+  color: #111827;
+  cursor: pointer;
+}
+
+.btn-outline:hover {
+  background: #F3F4F6;
+}
+
+.btn-secondary {
+  border-radius: 999px;
+  padding: 0.48rem 1.35rem;
+  font-size: 0.9rem;
+  border: none;
+  background: #6F8CFD;
+  color: #fff;
+  cursor: pointer;
+}
+
+/* Section cards */
+
+.summary-section-card {
+  padding: 1.5rem 1.75rem 1.7rem;
+  display: flex;
+  flex-direction: column;
+  gap: 1rem;
+}
+
+.summary-section-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.summary-section-header h2 {
+  margin: 0;
+  font-size: 1.1rem;
+  font-weight: 600;
+  color: #111827;
+}
+
+/* Live header */
+
+.live-header-right {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  font-size: 0.8rem;
+  color: #6B7280;
+}
+
+.live-updated {
+  font-style: italic;
+}
+
+/* Tables */
+
+.summary-table-wrapper {
+  width: 100%;
+  overflow-x: auto;
+}
+
+.summary-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 0.88rem;
+  table-layout: fixed;
+}
+
+/* Keep header labels on a single line */
+.summary-table th {
+  white-space: nowrap;
+  text-align: center;
+}
+
+.summary-table th,
+.summary-table td {
+  white-space: normal;      /* allows long names to wrap */
+  word-wrap: break-word;
+}
+
+.summary-table thead th {
+  text-align: left;
+  padding: 0.55rem 0.4rem;
+  color: #6B7280;
+  font-weight: 500;
+  border-bottom: 1px solid #E5E7EB;
+}
+
+.summary-table tbody td {
+  padding: 0.6rem 0.4rem;
+  border-bottom: 1px solid #F3F4F6;
+}
+
+.summary-empty-row td {
+  text-align: center;
+  padding: 1.25rem 0.4rem;
+  color: #9CA3AF;
+}
+
+/* Footer (Download CSV) */
+
+.summary-card-footer {
+  display: flex;
+  justify-content: flex-end;
+  margin-top: 0.9rem;
+}
+
+/* ============================
+   Student Engagement – table
+   ============================ */
+
+/* Slight hover on table rows */
+.summary-table tbody tr:hover {
+  background: #f9fafb;
+}
+
+/* Attendance column */
+.att-status-label {
+  font-size: 0.78rem;
+  font-weight: 600;
+  color: #111827;
+  margin-bottom: 0.35rem;
+}
+
+.att-btn-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.25rem;
+}
+
+/* Base pill button */
+.att-btn {
+  border-radius: 999px;
+  border: 1px solid #e5e7eb;
+  background: #ffffff;
+  padding: 0.15rem 0.7rem;
+  font-size: 0.72rem;
+  line-height: 1.2;
+  cursor: pointer;
+  transition: background-color 0.15s ease, color 0.15s ease,
+    box-shadow 0.15s ease, border-color 0.15s ease, transform 0.05s ease;
+}
+
+/* Hover effect */
+.att-btn:hover {
+  box-shadow: 0 1px 3px rgba(15, 23, 42, 0.12);
+  transform: translateY(-0.5px);
+}
+
+/* State-specific colours */
+.att-btn-present {
+  color: #166534;
+  border-color: #bbf7d0;
+  background: #f0fdf4;
+}
+
+.att-btn-late {
+  color: #92400e;
+  border-color: #fed7aa;
+  background: #fffbeb;
+}
+
+.att-btn-absent {
+  color: #991b1b;
+  border-color: #fecaca;
+  background: #fef2f2;
+}
+
+/* Active/selected state – filled pill */
+.att-btn-active.att-btn-present {
+  background: #16a34a;
+  border-color: #16a34a;
+  color: #ffffff;
+}
+
+.att-btn-active.att-btn-late {
+  background: #f97316;
+  border-color: #f97316;
+  color: #ffffff;
+}
+
+.att-btn-active.att-btn-absent {
+  background: #ef4444;
+  border-color: #ef4444;
+  color: #ffffff;
+}
+
+/* Actions column – icon buttons side by side */
+.summary-actions-wrap {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.4rem;
+}
+
+/* Base icon button style */
+.summary-icon-btn {
+  width: 30px;
+  height: 30px;
+  border-radius: 999px;
+  border: none;
+  padding: 0;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  background: #ffffff;
+  box-shadow: 0 1px 3px rgba(15, 23, 42, 0.15);
+  transition: transform 0.08s ease, box-shadow 0.12s ease,
+    background-color 0.12s ease;
+}
+
+.summary-icon-btn img {
+  width: 16px;
+  height: 16px;
+  display: block;
+}
+
+/* Edit = blue tone */
+.summary-icon-btn-edit {
+  background: #eff6ff;
+}
+
+.summary-icon-btn-edit:hover {
+  background: #dbeafe;
+  box-shadow: 0 2px 6px rgba(37, 99, 235, 0.35);
+  transform: translateY(-1px);
+}
+
+/* Delete = red tone */
+.summary-icon-btn-delete {
+  background: #fef2f2;
+}
+
+.summary-icon-btn-delete:hover {
+  background: #fee2e2;
+  box-shadow: 0 2px 6px rgba(239, 68, 68, 0.35);
+  transform: translateY(-1px);
+}
+
+/* Make behaviour lines slightly tighter and smaller */
+.summary-table td:nth-child(5) { /* 5th column = Behaviour in your table */
+  font-size: 0.85rem;
+  line-height: 1.3;
+}
+
+/* Behaviour column – compact, neat multi-line text */
+.behaviour-cell {
+  font-size: 0.85rem;
+  line-height: 1.35;
+  color: #4b5563;          /* neutral gray */
+  white-space: normal;     /* allow wrapping */
+  vertical-align: middle;
+}
+
+/* When it's just "On track / Monitor / At risk" */
+.behaviour-cell:only-child,
+.behaviour-cell:not(:has(br)) {
+  font-weight: 500;
+  color: #16a34a;          /* green for good behaviour */
+}
+
+/* Style metric labels (Drowsy:, Tab away:, Idle:) */
+.behaviour-cell strong {
+  font-weight: 600;
+  color: #1f2937;       /* darker gray */
+}
+
+/* ===== Live roster status pills ===== */
+
+.live-status-pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.4rem;
+  padding: 0.25rem 0.8rem;
+  border-radius: 999px;
+  font-size: 0.85rem;
+  font-weight: 500;
+  letter-spacing: 0.01em;
+  border: 1px solid transparent;
+}
+
+.live-status-dot {
+  width: 0.45rem;
+  height: 0.45rem;
+  border-radius: 999px;
+}
+
+/* Awake = green */
+.live-status-awake {
+  background: #e7f8ef;
+  color: #166534;
+  border-color: #bbf7d0;
+}
+.live-status-awake .live-status-dot {
+  background: #16a34a;
+}
+
+/* Drowsy = yellow */
+.live-status-drowsy {
+  background: #fef7e5;
+  color: #92400e;
+  border-color: #fde68a;
+}
+.live-status-drowsy .live-status-dot {
+  background: #fbbf24;
+}
+
+/* Away = red */
+.live-status-away {
+  background: #fee2e2;
+  color: #b91c1c;
+  border-color: #fecaca;
+}
+.live-status-away .live-status-dot {
+  background: #ef4444;
+}
+
+/* Fallback / unknown */
+.live-status-default {
+  background: #eef2ff;
+  color: #3730a3;
+  border-color: #e0e7ff;
+}
+.live-status-default .live-status-dot {
+  background: #4f46e5;
+}
+
+/* Small screens */
+
+@media (max-width: 1024px) {
+  .summary-stats-row {
+    grid-template-columns: 1fr;
+  }
+
+  .summary-controls {
+    flex-direction: column;
+    align-items: flex-start;
+  }
+
+  .summary-control-actions {
+    align-self: flex-start;
+  }
+}

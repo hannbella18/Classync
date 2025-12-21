@@ -1,0 +1,370 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <title>Classync – Manage Classes</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+
+  <!-- Poppins font -->
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link
+    href="https://fonts.googleapis.com/css2?family=Poppins:wght@300;400;500;600;700&display=swap"
+    rel="stylesheet"
+  />
+
+  <link
+    rel="stylesheet"
+    href="{{ url_for('static', filename='css/admin_classes.css') }}"
+  />
+</head>
+<body>
+  <div class="admin-page">
+
+    <!-- NAVBAR -->
+    <header class="admin-navbar">
+      <div class="admin-nav-left">
+        <a href="{{ url_for('admin_dashboard') }}" class="admin-logo admin-logo-link">
+          Classync
+        </a>
+      </div>
+
+      <div class="admin-nav-center">
+        <div class="admin-nav-title">Classes</div>
+      </div>
+
+      <div class="admin-nav-right">
+        <div class="admin-profile">
+          <div class="admin-avatar">
+            {{ (current_user.name[0:1]|upper ~ (current_user.name.split(' ')[-1][0:1]|upper if current_user.name.split(' ')|length > 1 else "")) if current_user else "AD" }}
+          </div>
+          <div class="admin-profile-text">
+            <div class="admin-profile-name">
+              {{ current_user.name if current_user else "Admin User" }}
+            </div>
+            <div class="admin-profile-role">Administrator</div>
+          </div>
+        </div>
+
+        <a href="{{ url_for('logout') }}" class="admin-logout-btn">
+          <span class="logout-icon">⏻</span> Logout
+        </a>
+      </div>
+    </header>
+
+    <!-- MAIN -->
+    <main class="admin-main">
+          <!-- FLASH MESSAGES -->
+          {% with messages = get_flashed_messages(with_categories=true) %}
+            {% if messages %}
+              <div class="flash-container">
+                {% for category, message in messages %}
+                  <div class="flash flash-{{ category }}">
+                    {{ message }}
+                  </div>
+                {% endfor %}
+              </div>
+            {% endif %}
+          {% endwith %}
+
+      <!-- HEADER + ADD BUTTON -->
+      <section class="classes-header">
+        <div>
+          <h1 class="page-title">Manage Classes</h1>
+          <p class="page-subtitle">
+            View existing classes and add new ones for lecturers to use in Classync.
+          </p>
+        </div>
+        <button id="toggleAddClass" class="primary-btn">
+          + Add new class
+        </button>
+      </section>
+
+      <!-- SEARCH + FILTER TOOLBAR (similar style to Courses page) -->
+      <section class="classes-toolbar">
+        <div class="classes-toolbar-left">
+          <h2 class="classes-subtitle">Class Overview</h2>
+        </div>
+
+        <div class="classes-toolbar-right">
+          <!-- Search box -->
+          <div class="search-wrapper" data-label="Search">
+            <input
+              type="text"
+              id="classSearch"
+              class="classes-search-input"
+              placeholder="Search by course, lecturer, group"
+            />
+          </div>
+
+          <!-- Mode filter -->
+          <div class="filter-wrapper" data-label="Mode">
+            <select id="classFilterMode" class="classes-select">
+              <option value="all">All modes</option>
+              <option value="Online">Online</option>
+              <option value="Face to face">Face to face</option>
+            </select>
+          </div>
+
+          <!-- Department filter (optional, can remove if you don’t want) -->
+          <div class="filter-wrapper" data-label="Department">
+            <select id="classFilterDept" class="classes-select">
+              <option value="all">All departments</option>
+              {% for dept in departments %}
+                <option value="{{ dept.name }}">{{ dept.name }}</option>
+              {% endfor %}
+            </select>
+          </div>
+        </div>
+      </section>
+
+      <hr class="classes-divider">
+
+      <!-- SLIDE-DOWN ADD CLASS FORM -->
+      <section class="add-class-wrapper" id="addClassWrapper">
+        <div class="add-class-card">
+          <div class="add-class-header">
+            <h2>Add new class</h2>
+            <button id="closeAddClass" class="close-btn" aria-label="Close">✕</button>
+          </div>
+
+          <form
+            id="addClassForm"
+            method="POST"
+            action="{{ url_for('admin_create_class') }}"
+          >
+            <input type="hidden" id="is_edit" name="is_edit" value="0">
+            <input type="hidden" id="edit_class_id" name="edit_class_id" value="">
+
+            <div class="form-grid">
+              <!-- Row 1 -->
+              <div class="form-group">
+                <label for="course_code">Course code</label>
+                <input type="text" id="course_code" name="course_code" required />
+              </div>
+
+              <div class="form-group">
+                <label for="course_name">Course name</label>
+                <input type="text" id="course_name" name="course_name" required />
+              </div>
+
+              <div class="form-group">
+                <label for="group_name">Group</label>
+                <input
+                  type="text"
+                  id="group_name"
+                  name="group_name"
+                  placeholder="e.g. T1 / Group A"
+                  required
+                />
+              </div>
+
+              <!-- Row 2 -->
+              <div class="form-group">
+                <label for="lecturer_id">Lecturer</label>
+                <select id="lecturer_id" name="lecturer_id">
+                  <option value="">Select lecturer</option>
+                  {% for lec in lecturers %}
+                    <option value="{{ lec.id }}">{{ lec.name }} ({{ lec.email }})</option>
+                  {% endfor %}
+                </select>
+              </div>
+
+              <div class="form-group">
+                <label for="mode">Mode</label>
+                <select id="mode" name="mode">
+                  <option value="Online">Online</option>
+                  <option value="Physical">Physical</option>
+                  <option value="Hybrid">Hybrid</option>
+                </select>
+              </div>
+
+              <div class="form-group">
+                <label for="dept_id">Department</label>
+                <select id="dept_id" name="dept_id">
+                  <option value="">Select department</option>
+                  {% for dept in departments %}
+                    <option value="{{ dept.id }}">{{ dept.name }}</option>
+                  {% endfor %}
+                </select>
+              </div>
+
+              <!-- Row 3: Online link | Location (Room) | Day -->
+              <div class="form-group" id="link-wrapper">
+                <label for="platform_link">Online link</label>
+                <input
+                  type="text"
+                  id="platform_link"
+                  name="platform_link"
+                  placeholder="https://meet.google.com/..."
+                />
+              </div>
+
+              <div class="form-group" id="location-wrapper">
+                <label for="location">Location (Room)</label>
+                <input
+                  type="text"
+                  id="location"
+                  name="location"
+                  placeholder="e.g. DKU5, Lab B104"
+                />
+              </div>
+
+              <div class="form-group">
+                <label for="day_of_week">Day of week</label>
+                <select id="day_of_week" name="day_of_week">
+                  <option value="">Select day</option>
+                  <option value="1">Monday</option>
+                  <option value="2">Tuesday</option>
+                  <option value="3">Wednesday</option>
+                  <option value="4">Thursday</option>
+                  <option value="5">Friday</option>
+                  <option value="6">Saturday</option>
+                  <option value="7">Sunday</option>
+                </select>
+              </div>
+
+              <!-- Row 4: Start / End time -->
+              <div class="form-group">
+                <label for="time_start">Start time</label>
+                <input type="time" id="time_start" name="time_start" />
+              </div>
+
+              <div class="form-group">
+                <label for="time_end">End time</label>
+                <input type="time" id="time_end" name="time_end" />
+              </div>
+
+              <div class="form-group form-empty"></div>
+            </div>
+
+            <div class="form-actions">
+              <button type="button" class="btn-secondary" id="cancelAddClass">Cancel</button>
+              <button type="submit" class="primary-btn">Save class</button>
+            </div>
+          </form>
+        </div>
+      </section>
+
+      <!-- CLASSES TABLE -->
+      <section class="classes-table-section">
+        <div class="card">
+          <div class="card-header-row">
+            <h2 class="card-title">Existing classes</h2>
+            <span class="card-count">
+              {{ classes|length if classes is defined else 0 }} total
+            </span>
+          </div>
+
+          <div class="table-wrapper">
+            <table class="classes-table">
+              <thead>
+                <tr>
+                  <th>Course code</th>
+                  <th>Course name</th>
+                  <th>Group</th>
+                  <th>Lecturer</th>
+                  <th>Mode</th>
+                  <th>Location</th>
+                  <th>Link</th>
+                  <th>Department</th>
+                  <th>Day</th>
+                  <th>Time</th>
+                  <th>Actions</th>
+                </tr>
+              </thead>
+              <tbody>
+                {% if classes and classes|length > 0 %}
+                  {% for c in classes %}
+                  <tr
+                    class="class-row"
+                    data-code="{{ c.course_code }}"
+                    data-name="{{ c.course_name|lower }}"
+                    data-group="{{ c.group_name|lower }}"
+                    data-lecturer="{{ c.lecturer|lower }}"
+                    data-mode="{{ c.mode }}"
+                    data-dept="{{ c.dept_name }}"
+                  >
+                    <td>{{ c.course_code }}</td>
+                    <td>{{ c.course_name }}</td>
+                    <td>{{ c.group_name }}</td>
+                    <td>{{ c.lecturer }}</td>
+                    <td>{{ c.mode }}</td>
+                    <td>{{ c.location }}</td>
+                    <td>{{ c.link }}</td>
+                    <td>{{ c.dept_name }}</td>
+                    <td>
+                      {# convert day_of_week number → short label #}
+                      {% if c.day_of_week == 1 %}
+                        Mon
+                      {% elif c.day_of_week == 2 %}
+                        Tue
+                      {% elif c.day_of_week == 3 %}
+                        Wed
+                      {% elif c.day_of_week == 4 %}
+                        Thu
+                      {% elif c.day_of_week == 5 %}
+                        Fri
+                      {% elif c.day_of_week == 6 %}
+                        Sat
+                      {% elif c.day_of_week == 7 %}
+                        Sun
+                      {% else %}
+                        -
+                      {% endif %}
+                    </td>
+                    <td>
+                      {% if c.time_start or c.time_end %}
+                        {{ c.time_start }}–{{ c.time_end }}
+                      {% else %}
+                        -
+                      {% endif %}
+                    </td>
+                    <td>
+                      <button
+                        type="button"
+                        class="table-btn table-btn-edit"
+                        data-code="{{ c.course_code }}"
+                        data-name="{{ c.course_name }}"
+                        data-group="{{ c.group_name }}"
+                        data-lecturer-id="{{ c.lecturer_id }}"
+                        data-mode="{{ c.ui_mode }}"
+                        data-dept-id="{{ c.dept_id }}"
+                        data-location="{{ c.location }}"
+                        data-link="{{ c.link }}"
+                        data-day="{{ c.day_of_week }}"
+                        data-time-start="{{ c.time_start }}"
+                        data-time-end="{{ c.time_end }}"
+                      >
+                        <img src="{{ url_for('static', filename='img/pen.png') }}" alt="Edit" />
+                      </button>
+
+                      <button
+                        type="button"
+                        class="table-btn table-btn-delete"
+                        data-id="{{ c.course_code }}"
+                      >
+                        <img src="{{ url_for('static', filename='img/bin.png') }}" alt="Delete" />
+                      </button>
+                    </td>
+                  </tr>
+                  {% endfor %}
+                {% else %}
+                  <tr>
+                    <td colspan="11" class="empty-row">
+                      No classes created yet. Click “Add new class” to get started.
+                    </td>
+                  </tr>
+                {% endif %}
+              </tbody>
+            </table>
+          </div>
+        </div>
+      </section>
+
+    </main>
+  </div>
+
+  <script src="{{ url_for('static', filename='js/admin_classes.js') }}"></script>
+</body>
+</html>

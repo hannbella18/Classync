@@ -1,0 +1,90 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <title>Join Class – Classync</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+
+  <!-- Poppins font -->
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link
+    href="https://fonts.googleapis.com/css2?family=Poppins:wght@300;400;500;600;700&display=swap"
+    rel="stylesheet"
+  />
+
+  <!-- Optional shared styles -->
+  <link rel="stylesheet"
+        href="{{ url_for('static', filename='css/dashboard_main.css') }}">
+
+  <!-- Page-specific styles -->
+  <link rel="stylesheet"
+        href="{{ url_for('static', filename='css/join.css') }}">
+</head>
+<body>
+  <div class="join-wrapper">
+    <div class="join-card">
+      <h1 class="join-title">Join Class</h1>
+
+      <p class="join-class-name">
+        {{ class_id }} &mdash; {{ class_name }}
+      </p>
+
+      <p class="join-subtitle">
+        We will first try to recognise you using your camera. If we can't,
+        you can still join by filling in the form below.
+      </p>
+
+      <!-- Camera section -->
+      <div class="join-camera-block">
+        <div class="join-video-wrapper">
+          <video id="join-video" autoplay playsinline muted></video>
+        </div>
+        <p id="join-detect-status" class="join-detect-status">
+          Please allow camera access and look at the screen. Detecting face…
+        </p>
+      </div>
+
+      <div id="join-error" class="join-alert join-alert-error" style="display:none;"></div>
+      <div id="join-success" class="join-alert join-alert-success" style="display:none;"></div>
+
+      <form id="join-form"
+            data-class-id="{{ class_id }}"
+            data-token="{{ token or '' }}">
+        <div class="join-field">
+          <label for="student-name">Full name</label>
+          <input
+            type="text"
+            id="student-name"
+            name="name"
+            placeholder="e.g. Nur Aisyah binti Ali"
+            required
+          />
+        </div>
+
+        <div class="join-field">
+          <label for="student-email">Email</label>
+          <input
+            type="email"
+            id="student-email"
+            name="email"
+            placeholder="e.g. aisyah@student.upm.edu.my"
+            required
+          />
+        </div>
+
+        <button type="submit" class="join-btn">
+          Join class
+        </button>
+      </form>
+
+      <p class="join-footnote">
+        By joining, you agree that your presence may be measured using
+        camera-based attendance and engagement detection.
+      </p>
+    </div>
+  </div>
+
+  <script src="{{ url_for('static', filename='js/join.js') }}"></script>
+</body>
+</html>

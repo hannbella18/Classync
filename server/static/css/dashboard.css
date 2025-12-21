@@ -1,0 +1,48 @@
+:root{
+  --bg:#0b1020; --panel:#111933; --fg:#e8eefc; --muted:#9db0e6;
+  --border:#1d2745; --accent:#2a69ff;
+}
+*{box-sizing:border-box; font-family:system-ui,Segoe UI,Roboto,Arial}
+html,body{margin:0; background:var(--bg); color:var(--fg)}
+.topbar{display:flex; justify-content:space-between; align-items:center; padding:12px 16px; background:#0f1733; border-bottom:1px solid var(--border)}
+.topbar .left{display:flex; align-items:center; gap:10px}
+.icon{background:transparent; color:var(--fg); border:1px solid var(--border); border-radius:10px; padding:6px 10px; cursor:pointer}
+.brand{font-weight:700}
+.right{display:flex; align-items:center; gap:12px}
+.profile{display:flex; gap:10px; align-items:center}
+.avatar{width:28px; height:28px; border-radius:50%; background:#243a7a}
+.who .name{font-weight:600; font-size:13px}
+.who .pos{font-size:12px; color:var(--muted)}
+
+.wrap{padding:16px; display:grid; gap:16px}
+.panel{background:var(--panel); border:1px solid var(--border); border-radius:14px; padding:12px}
+.head{display:flex; align-items:center; justify-content:space-between}
+.hint{color:var(--muted); font-weight:400; font-size:12px; margin-left:6px}
+.tools{display:flex; gap:10px; align-items:center}
+.tools button{background:var(--accent); color:white; border:0; padding:6px 10px; border-radius:8px; cursor:pointer}
+#synced{color:var(--muted); font-size:12px}
+
+.table{margin-top:10px}
+.row{display:grid; grid-template-columns: 2fr 2fr 1.2fr 1fr; padding:10px 8px; border-bottom:1px solid var(--border)}
+.row.header{color:#bcd0ff; font-size:12px; border-bottom:1px solid var(--border); background:#0f1733; border-radius:8px}
+.row:not(.header):hover{background:#152048}
+
+.cards{display:grid; grid-template-columns: repeat(auto-fill,minmax(220px,1fr)); gap:12px; margin-top:8px}
+.card{display:block; text-decoration:none; color:var(--fg); background:#0f1733; border:1px solid var(--border); border-radius:12px; overflow:hidden}
+.card .thumb{height:120px; background:linear-gradient(160deg,#1c2f69,#0e1939)}
+.card .code{padding:10px; font-weight:700; letter-spacing:0.5px}
+.btn-join {
+  display:inline-block;
+  padding:6px 10px;
+  border-radius:8px;
+  background:#2a69ff;
+  color:#fff;
+  text-decoration:none;
+  font-size:12px;
+}
+.btn-join.full { display:block; text-align:center; margin-top:8px; }
+.host { color:#9db0e6; font-size:12px; margin-left:6px; }
+.card .actions { padding: 0 10px 10px; }
+/* Make the whole tile look/feel clickable */
+a.card { display:block; text-decoration:none; color:inherit; cursor:pointer; }
+a.card:hover { box-shadow: 0 0 0 1px rgba(42,105,255,.35), 0 8px 20px rgba(0,0,0,.35); transform: translateY(-1px); transition: .15s ease; }

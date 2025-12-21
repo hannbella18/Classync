@@ -1,0 +1,279 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <title>Classync – Analysis</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+
+  <!-- Poppins font -->
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link
+    href="https://fonts.googleapis.com/css2?family=Poppins:wght@300;400;500;600;700&display=swap"
+    rel="stylesheet"
+  />
+
+  <!-- Shared dashboard styles -->
+  <link rel="stylesheet" href="{{ url_for('static', filename='css/dashboard_main.css') }}">
+
+  <!-- Page-specific styles -->
+  <link rel="stylesheet" href="{{ url_for('static', filename='css/lecturer_analysis.css') }}">
+</head>
+<body>
+
+<div class="app-wrapper">
+  <!-- ========== SIDEBAR ========== -->
+  <aside class="sidebar">
+    <div class="sidebar-header">
+      <button class="logo-btn" id="sidebarToggle" aria-label="Toggle sidebar">
+        <div class="logo-mark">C</div>
+        <span class="logo-text classync-brand">Classync</span>
+      </button>
+    </div>
+
+    <nav class="sidebar-menu">
+      <a href="{{ url_for('dashboard') }}" class="menu-item">
+        <span class="menu-icon">🏠</span>
+        <span class="menu-label">Dashboard</span>
+      </a>
+      <a href="{{ url_for('courses') }}" class="menu-item">
+        <span class="menu-icon">📚</span>
+        <span class="menu-label">Courses</span>
+      </a>
+      <a href="{{ url_for('lecturer_analysis') }}" class="menu-item active">
+        <span class="menu-icon">📊</span>
+        <span class="menu-label">Analysis</span>
+      </a>
+    </nav>
+
+    <div class="sidebar-bottom">
+      <a href="{{ url_for('lecturer_settings') }}" class="menu-item">
+        <span class="menu-icon">⚙️</span>
+        <span class="menu-label">Settings</span>
+      </a>
+    </div>
+  </aside>
+
+  <!-- ========== MAIN AREA ========== -->
+  <div class="main-wrap">
+    <!-- Top navbar -->
+    <header class="topbar">
+      <div class="topbar-center">
+        <h1 class="page-title">Analysis</h1>
+      </div>
+
+      <div class="topbar-right">
+        <button id="notifToggle" class="icon-btn" aria-label="Notifications">🔔</button>
+
+        <div class="user-info">
+          <div class="avatar">
+            {{ current_user.initials if current_user else 'CS' }}
+          </div>
+          <div class="user-text">
+            <div class="user-name">
+              {{ current_user.name if current_user else 'Charles Santos' }}
+            </div>
+            <div class="user-role">Lecturer</div>
+          </div>
+        </div>
+
+        <a href="{{ url_for('logout') }}" class="icon-btn" aria-label="Logout">⏻</a>
+      </div>
+    </header>
+
+    <!-- ========== CONTENT ========== -->
+    <main class="dashboard-content">
+      <section class="analysis-grid">
+
+        <!-- HERO -->
+        <section class="card analysis-hero">
+          <div class="analysis-hero-left">
+            <div class="analysis-eyebrow">Lecturer | Engagement Analytics</div>
+            <h2 class="analysis-title">Class Engagement Analysis</h2>
+            <p class="analysis-desc">
+              This page summarizes student engagement for the selected session using attention, interaction,
+              and tab-focus signals. Use it to spot low-engagement periods and students who may need support.
+            </p>
+
+            <!-- Filters (frontend only for now) -->
+            <div class="analysis-filters">
+              <div class="filter">
+                <label class="filter-label">Course</label>
+                <select class="filter-input" id="courseSelect">
+                  <option value="__ALL__">All courses</option>
+                  <!-- later: populate from backend -->
+                </select>
+              </div>
+
+              <div class="filter session-filter">
+                <label class="filter-label">Session</label>
+                <div class="session-inline">
+                  <select class="filter-input" id="sessionSelect">
+                    <option value="latest">Latest session</option>
+                  </select>
+                  <button class="primary-btn update-btn" id="btnUpdate">
+                    Update
+                  </button>
+                </div>
+              </div>
+
+            </div>
+
+            <!-- KPI chips -->
+            <div class="kpi-chips">
+              <div class="kpi-chip">
+                <div class="kpi-chip-label">Avg Engagement</div>
+                <div class="kpi-chip-value" id="kpiAvgEng">--%</div>
+              </div>
+              <div class="kpi-chip">
+                <div class="kpi-chip-label">Students Active</div>
+                <div class="kpi-chip-value" id="kpiActive">--</div>
+              </div>
+              <div class="kpi-chip">
+                <div class="kpi-chip-label">Drowsy Alerts</div>
+                <div class="kpi-chip-value" id="kpiDrowsy">--</div>
+              </div>
+              <div class="kpi-chip">
+                <div class="kpi-chip-label">Tab Switches</div>
+                <div class="kpi-chip-value" id="kpiTab">--</div>
+              </div>
+            </div>
+          </div>
+
+          <div class="analysis-hero-right">
+            <div class="hero-badge">
+              <span class="hero-badge-dot"></span>
+              Live-ready layout
+            </div>
+
+          </div>
+        </section>
+
+        <!-- ROW 1 (3 charts) -->
+        <section class="card chart-card">
+          <header class="card-header">
+            <h2>Engagement Over Time</h2>
+            <span class="card-subtitle">Timeline trend for selected session</span>
+          </header>
+          <div class="chart-wrap">
+            <canvas id="chartEngagementTime"></canvas>
+            <div class="chart-placeholder" data-for="chartEngagementTime">
+              Chart will appear here after you connect backend data.
+            </div>
+          </div>
+        </section>
+
+        <section class="card chart-card">
+          <header class="card-header">
+            <h2>Engagement by Student</h2>
+            <span class="card-subtitle">Compare average engagement across students</span>
+            <button class="text-link small" id="btnToggleStudents" type="button">
+              Show all
+            </button>
+          </header>
+          <div class="chart-wrap">
+            <canvas id="chartEngagementStudent"></canvas>
+            <div class="chart-placeholder" data-for="chartEngagementStudent">
+              Chart will appear here after you connect backend data.
+            </div>
+          </div>
+        </section>
+
+        <section class="card chart-card">
+          <header class="card-header">
+            <h2>Attention State Breakdown</h2>
+            <span class="card-subtitle">Attentive • Idle • Drowsy • Tab away</span>
+          </header>
+          <div class="chart-wrap">
+            <canvas id="chartStateBreakdown"></canvas>
+            <div class="chart-placeholder" data-for="chartStateBreakdown">
+              Chart will appear here after you connect backend data.
+            </div>
+          </div>
+        </section>
+
+        <!-- ROW 2 (REPLACED: 3 meaningful lecturer insights) -->
+        <!-- (1) Engagement Risk Timeline -->
+        <section class="card chart-card">
+          <header class="card-header">
+            <h2>Engagement Risk Timeline</h2>
+            <span class="card-subtitle">Low / Medium / High risk per minute (derived from engagement)</span>
+          </header>
+          <div class="chart-wrap">
+            <canvas id="chartRiskTimeline"></canvas>
+            <div class="chart-placeholder" data-for="chartRiskTimeline">
+              Chart will appear here after you connect backend data.
+            </div>
+          </div>
+        </section>
+
+        <!-- (2) Disengagement Cause Breakdown -->
+        <section class="card chart-card">
+          <header class="card-header">
+            <h2>Disengagement Cause Breakdown</h2>
+            <span class="card-subtitle">Idle • Drowsy • Tab away (minutes)</span>
+          </header>
+
+          <div class="chart-wrap">
+            <canvas id="chartDisengagementCauses"></canvas>
+            <div class="chart-placeholder" data-for="chartDisengagementCauses">
+              Chart will appear here after you connect backend data.
+            </div>
+          </div>
+        </section>
+
+        <!-- (3) Risk Level Breakdown (KEEP your existing backend endpoint) -->
+        <section class="card chart-card">
+          <header class="card-header">
+            <h2>Risk Level Breakdown</h2>
+            <span class="card-subtitle">Low • Medium • High risk counts</span>
+          </header>
+          <div class="chart-wrap">
+            <canvas id="chartEngagementSession"></canvas>
+            <div class="chart-placeholder" data-for="chartEngagementSession">
+              Chart will appear here after you connect backend data.
+            </div>
+          </div>
+        </section>
+
+      </section>
+    </main>
+
+    <!-- ========== NOTIFICATION POPUP (same as dashboard) ========== -->
+    <aside id="notifPanel" class="notif-panel" aria-hidden="true">
+      <header class="notif-header">
+        <h3>Notifications</h3>
+        <button id="notifClearBtn" class="text-link small">Clear all</button>
+      </header>
+      <ul class="notif-list">
+        {% if notifications %}
+          {% for n in notifications %}
+            <li class="notif-item">
+              <span class="notif-dot {{ n.level }}"></span>
+              <div class="notif-main">
+                {% if n.type %}
+                  <span class="notif-tag">{{ n.type.replace('_', ' ')|title }}</span>
+                {% endif %}
+                <span class="notif-message">{{ n.message }}</span>
+                <span class="notif-time">{{ n.created_at[11:16] if n.created_at }}</span>
+              </div>
+            </li>
+          {% endfor %}
+        {% else %}
+          <li>No notifications yet.</li>
+        {% endif %}
+      </ul>
+      <footer class="notif-footer">
+        <button class="text-link small">View all</button>
+      </footer>
+    </aside>
+  </div>
+</div>
+
+<!-- Shared behaviors (sidebar toggle, notif panel) -->
+<script src="{{ url_for('static', filename='js/dashboard_main.js') }}"></script>
+<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+<!-- Page-specific JS -->
+<script src="{{ url_for('static', filename='js/lecturer_analysis.js') }}?v=2"></script>
+</body>
+</html>

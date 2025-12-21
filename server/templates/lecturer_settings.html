@@ -1,0 +1,326 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <title>Classync – Settings</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+
+  <!-- Poppins font -->
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link
+    href="https://fonts.googleapis.com/css2?family=Poppins:wght@300;400;500;600;700&display=swap"
+    rel="stylesheet"
+  />
+
+  <!-- Your existing dashboard layout/theme -->
+  <link rel="stylesheet" href="{{ url_for('static', filename='css/dashboard_main.css') }}">
+
+  <!-- Settings page UI -->
+  <link rel="stylesheet" href="{{ url_for('static', filename='css/lecturer_settings.css') }}">
+</head>
+<body>
+
+<div class="app-wrapper">
+
+  <!-- ========== SIDEBAR ========== -->
+  <aside class="sidebar">
+    <div class="sidebar-header">
+      <button class="logo-btn" id="sidebarToggle" aria-label="Toggle sidebar">
+        <div class="logo-mark">C</div>
+        <span class="logo-text classync-brand">Classync</span>
+      </button>
+    </div>
+
+    <nav class="sidebar-menu">
+      <a href="{{ url_for('dashboard') }}" class="menu-item">
+        <span class="menu-icon">🏠</span>
+        <span class="menu-label">Dashboard</span>
+      </a>
+      <a href="{{ url_for('courses') }}" class="menu-item">
+        <span class="menu-icon">📚</span>
+        <span class="menu-label">Courses</span>
+      </a>
+      <a href="{{ url_for('lecturer_analysis') }}" class="menu-item">
+        <span class="menu-icon">📊</span>
+        <span class="menu-label">Analysis</span>
+      </a>
+    </nav>
+
+    <div class="sidebar-bottom">
+      <a href="{{ url_for('lecturer_settings') }}" class="menu-item active">
+        <span class="menu-icon">⚙️</span>
+        <span class="menu-label">Settings</span>
+      </a>
+    </div>
+  </aside>
+
+  <!-- ========== MAIN AREA ========== -->
+  <div class="main-wrap">
+
+    <!-- Top navbar -->
+    <header class="topbar">
+      <div class="topbar-center">
+        <h1 class="page-title">Settings</h1>
+      </div>
+
+      <div class="topbar-right">
+        <button id="notifToggle" class="icon-btn" aria-label="Notifications">🔔</button>
+
+        <div class="user-info">
+          <div class="avatar">
+            {{ current_user.initials if current_user else 'CS' }}
+          </div>
+          <div class="user-text">
+            <div class="user-name">
+              {{ current_user.name if current_user else 'Charles Santos' }}
+            </div>
+            <div class="user-role">Lecturer</div>
+          </div>
+        </div>
+
+        <a href="{{ url_for('logout') }}" class="icon-btn" aria-label="Logout">⏻</a>
+      </div>
+    </header>
+
+    <!-- ========== CONTENT ========== -->
+    <main class="settings-content">
+      {% with messages = get_flashed_messages(with_categories=true) %}
+        {% if messages %}
+          <div class="flash-wrap">
+            {% for category, msg in messages %}
+              <div class="flash flash-{{ category }}">{{ msg }}</div>
+            {% endfor %}
+          </div>
+        {% endif %}
+      {% endwith %}
+
+      <section class="settings-grid">
+
+        <!-- HERO / HEADER CARD -->
+        <section class="card settings-hero wow-hero hero-split">
+          <div class="hero-left">
+            <div class="settings-eyebrow">Account</div>
+
+            <h2 class="settings-title">
+              Manage your profile
+            </h2>
+
+            <p class="hero-line">
+              Update your personal details and contact information.
+            </p>
+            <p class="hero-line muted">
+              Keep your Classync account secure and up to date.
+            </p>
+
+            <div class="hero-chips">
+              <span class="hero-chip">Secure</span>
+              <span class="hero-chip">Updated</span>
+              <span class="hero-chip">Private</span>
+            </div>
+          </div>
+
+          <div class="hero-right">
+            <div class="settings-hero-badge hero-badge-wow">
+              <div class="badge-top">
+                <div class="badge-icon">👤</div>
+
+                <div class="badge-text">
+                  <div class="badge-name">
+                    {{ current_user.name if current_user else 'Charles Santos' }}
+                  </div>
+                  <div class="badge-role">
+                    Lecturer
+                  </div>
+                  <div class="badge-email">
+                    {{ current_user.email if current_user else 'lecturer@upm.edu.my' }}
+                  </div>
+                </div>
+              </div>
+            </div>
+        </section>
+
+        <!-- PROFILE SETTINGS (COLLAPSIBLE) -->
+        <section class="card settings-card settings-collapsible" data-collapsible data-open="false">
+          <button class="settings-collapsible-header" type="button" aria-expanded="false">
+            <div class="settings-collapsible-left">
+              <h2>Profile Settings</h2>
+              <span class="card-subtitle">Edit your contact and department details</span>
+            </div>
+
+            <div class="settings-collapsible-right">
+              <span class="pill pill-blue">Basic</span>
+              <span class="chev" aria-hidden="true">▾</span>
+            </div>
+          </button>
+
+          <div class="settings-collapsible-body" hidden>
+            <form class="settings-form" method="POST" action="{{ url_for('lecturer_settings') }}">
+              <div class="form-grid">
+
+                <div class="form-field">
+                  <label>Full Name</label>
+                  <input type="text" name="name" value="{{ current_user.name or '' }}" required>
+                  <small class="hint">This name will be shown in your profile.</small>
+                </div>
+
+                <div class="form-field">
+                  <label>Email</label>
+                  <input type="email" value="{{ current_user.email }}" disabled>
+                  <small class="hint">Used for login and notifications.</small>
+                </div>
+
+                <div class="form-field">
+                  <label>Department</label>
+
+                  <select name="dept_id">
+                    <option value="">Select department</option>
+
+                    {% for d in departments %}
+                      <option value="{{ d.dept_id }}"
+                        {% if current_user.dept_id == d.dept_id %}selected{% endif %}>
+                        {{ d.dept_id }} — {{ d.name }}
+                      </option>
+                    {% endfor %}
+                  </select>
+                </div>
+              </div>
+
+              <div class="form-actions">
+                <button type="reset" class="btn btn-ghost">Reset</button>
+                <button type="submit" class="btn btn-primary">Save Changes</button>
+              </div>
+            </form>
+          </div>
+        </section>
+
+        <!-- CHANGE PASSWORD (COLLAPSIBLE) -->
+        <section class="card settings-card settings-collapsible" data-collapsible data-open="false">
+          <button class="settings-collapsible-header" type="button" aria-expanded="false">
+            <div class="settings-collapsible-left">
+              <h2>Change Password</h2>
+              <span class="card-subtitle">Update your password to keep your account secure</span>
+            </div>
+
+            <div class="settings-collapsible-right">
+              <span class="pill pill-red">Security</span>
+              <span class="chev" aria-hidden="true">▾</span>
+            </div>
+          </button>
+
+          <div class="settings-collapsible-body" hidden>
+            <form class="settings-form" method="POST" action="{{ url_for('lecturer_change_password') }}">
+              <div class="form-grid">
+
+                <div class="form-field">
+                  <label>Current Password</label>
+                  <div class="password-wrapper">
+                    <input type="password" id="current_password" name="current_password" placeholder="Enter current password">
+                    <img
+                      src="{{ url_for('static', filename='img/closed-password.png') }}"
+                      class="pw-icon"
+                      data-target="current_password"
+                      data-open="{{ url_for('static', filename='img/open-password.png') }}"
+                      data-closed="{{ url_for('static', filename='img/closed-password.png') }}"
+                      alt="toggle password visibility"
+                    >
+                  </div>
+                </div>
+
+                <div class="form-field">
+                  <label>New Password</label>
+                  <div class="password-wrapper">
+                    <input type="password" id="new_password" name="new_password" placeholder="Create a strong password">
+                    <img
+                      src="{{ url_for('static', filename='img/closed-password.png') }}"
+                      class="pw-icon"
+                      data-target="new_password"
+                      data-open="{{ url_for('static', filename='img/open-password.png') }}"
+                      data-closed="{{ url_for('static', filename='img/closed-password.png') }}"
+                      alt="toggle password visibility"
+                    >
+                  </div>
+                  <small class="hint">Tip: use 8+ chars with a number & symbol.</small>
+                </div>
+
+                <div class="form-field">
+                  <label>Confirm New Password</label>
+                  <div class="password-wrapper">
+                    <input type="password" id="confirm_password" name="confirm_password" placeholder="Re-enter new password">
+                    <img
+                      src="{{ url_for('static', filename='img/closed-password.png') }}"
+                      class="pw-icon"
+                      data-target="confirm_password"
+                      data-open="{{ url_for('static', filename='img/open-password.png') }}"
+                      data-closed="{{ url_for('static', filename='img/closed-password.png') }}"
+                      alt="toggle password visibility"
+                    >
+                  </div>
+                </div>
+
+                <div class="form-field">
+                  <div class="security-box">
+                    <div class="security-title">Security Tips</div>
+                    <ul class="security-list">
+                      <li>Don’t reuse old passwords</li>
+                      <li>Avoid sharing credentials</li>
+                      <li>Update every few months</li>
+                    </ul>
+                  </div>
+                </div>
+
+              </div>
+
+              <div class="form-actions">
+                <button type="submit" class="btn btn-danger">Update Password</button>
+              </div>
+            </form>
+          </div>
+        </section>
+
+      </section>
+    </main>
+
+  </div>
+</div>
+
+<!-- ========== NOTIFICATION POPUP (same as dashboard/courses) ========== -->
+<aside id="notifPanel" class="notif-panel" aria-hidden="true">
+  <header class="notif-header">
+    <h3>Notifications</h3>
+    <button id="notifClearBtn" class="text-link small">Clear all</button>
+  </header>
+
+  <ul class="notif-list">
+    {% if notifications %}
+      {% for n in notifications %}
+        <li class="notif-item">
+          <span class="notif-dot {{ n.level }}"></span>
+
+          <div class="notif-main">
+            {% if n.type %}
+              <span class="notif-tag">
+                {{ n.type.replace('_', ' ')|title }}
+              </span>
+            {% endif %}
+            <span class="notif-message">{{ n.message }}</span>
+            <span class="notif-time">
+              {{ n.created_at[11:16] if n.created_at }}
+            </span>
+          </div>
+        </li>
+      {% endfor %}
+    {% else %}
+      <li>No notifications yet.</li>
+    {% endif %}
+  </ul>
+
+  <footer class="notif-footer">
+    <button class="text-link small">View all</button>
+  </footer>
+</aside>
+
+<script src="{{ url_for('static', filename='js/dashboard_main.js') }}"></script>
+<script src="{{ url_for('static', filename='js/lecturer_settings.js') }}"></script>
+</body>
+</html>

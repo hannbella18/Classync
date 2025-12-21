@@ -1,0 +1,222 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <title>Classync – Manage Faculties</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+
+  <!-- Poppins font -->
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link
+    href="https://fonts.googleapis.com/css2?family=Poppins:wght@300;400;500;600;700&display=swap"
+    rel="stylesheet"
+  />
+
+  <!-- Shared admin styles -->
+  <link
+    rel="stylesheet"
+    href="{{ url_for('static', filename='css/admin_dashboard.css') }}"
+  />
+
+  <!-- Page-specific styles -->
+  <link
+    rel="stylesheet"
+    href="{{ url_for('static', filename='css/admin_faculties.css') }}"
+  />
+</head>
+<body>
+  <div class="admin-page">
+
+    <!-- Navbar -->
+    <header class="admin-navbar">
+      <div class="admin-nav-left">
+        <a href="{{ url_for('admin_dashboard') }}" class="admin-logo admin-logo-link">
+          Classync
+        </a>
+      </div>
+
+      <div class="admin-nav-center">
+        <div class="admin-nav-title">Faculties</div>
+      </div>
+
+      <div class="admin-nav-right">
+        <div class="admin-profile">
+          <div class="admin-avatar">
+            {{ (current_user.name[0:1]|upper ~ (current_user.name.split(' ')[-1][0:1]|upper if current_user.name.split(' ')|length > 1 else "")) if current_user else "AD" }}
+          </div>
+          <div class="admin-profile-text">
+            <div class="admin-profile-name">
+              {{ current_user.name if current_user else "Admin User" }}
+            </div>
+            <div class="admin-profile-role">Administrator</div>
+          </div>
+        </div>
+
+        <a href="{{ url_for('logout') }}" class="admin-logout-btn">
+          <span class="logout-icon">⏻</span> Logout
+        </a>
+      </div>
+    </header>
+
+    <!-- MAIN -->
+    <main class="admin-main">
+
+      <!-- Header + Add button -->
+      <section class="faculties-header">
+        <div>
+          <h1 class="page-title">Manage Faculties</h1>
+          <p class="page-subtitle">
+            Add or edit faculties that group departments in Classync.
+          </p>
+        </div>
+        <button id="toggleAddFaculty" class="primary-btn">
+          + Add new faculty
+        </button>
+      </section>
+
+      <!-- Slide-down Add Faculty form -->
+      <section class="add-fac-wrapper" id="addFacultyWrapper">
+        <div class="add-fac-card">
+          <div class="add-fac-header">
+            <h2>Add new faculty</h2>
+            <button id="closeAddFaculty" class="close-btn" aria-label="Close">✕</button>
+          </div>
+
+          <form id="addFacultyForm"
+                method="POST"
+                action="{{ url_for('admin_create_faculty') }}">
+            <input type="hidden" id="is_edit_faculty" name="is_edit" value="no" />
+            <input type="hidden" id="edit_faculty_id" name="edit_faculty_id" value="" />
+
+            <div class="form-grid">
+              <!-- Faculty code (faculty_id in DB) -->
+              <div class="form-group">
+                <label for="fac_code">Faculty code</label>
+                <input
+                  type="text"
+                  id="fac_code"
+                  name="faculty_id"
+                  placeholder="e.g. FSKTM, FEP"
+                  required
+                />
+              </div>
+
+              <!-- Faculty name -->
+              <div class="form-group">
+                <label for="fac_name">Faculty name</label>
+                <input
+                  type="text"
+                  id="fac_name"
+                  name="name"
+                  required
+                />
+              </div>
+            </div>
+
+            <div class="form-actions">
+              <button type="button" class="btn-secondary" id="cancelAddFaculty">
+                Cancel
+              </button>
+              <button type="submit" class="primary-btn">
+                Save faculty
+              </button>
+            </div>
+          </form>
+        </div>
+      </section>
+
+      <!-- Faculties overview + filters -->
+      <section class="faculties-overview">
+        <div class="overview-header-row">
+          <h2 class="overview-title">Faculties Overview</h2>
+
+          <div class="table-filters">
+            <!-- SEARCH -->
+            <div class="filter-group">
+              <div class="filter-label">SEARCH</div>
+              <div class="filter-control filter-search">
+                <input
+                  type="text"
+                  id="facSearch"
+                  placeholder="Search by faculty name or code"
+                />
+                <span class="filter-search-icon">🔍</span>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <div class="overview-divider"></div>
+      </section>
+
+      <!-- Faculties table -->
+      <section class="faculties-table-section">
+        <div class="card">
+          <div class="card-header-row">
+            <h2 class="card-title">Existing faculties</h2>
+            <div class="card-header-right">
+              <span class="card-count">{{ faculties|length if faculties else 0 }} total</span>
+            </div>
+          </div>
+
+          <div class="table-wrapper">
+            <table class="faculties-table">
+              <thead>
+                <tr>
+                  <th>ID</th>
+                  <th>Faculty code</th>
+                  <th>Faculty name</th>
+                  <th>Actions</th>
+                </tr>
+              </thead>
+
+              <tbody>
+                {% if faculties and faculties|length > 0 %}
+                  {% for f in faculties %}
+                  <tr
+                    data-name="{{ f.name|lower }}"
+                    data-code="{{ f.faculty_id|lower }}"
+                  >
+                    <td>{{ f.id }}</td>
+                    <td>{{ f.faculty_id }}</td>
+                    <td>{{ f.name }}</td>
+                    <td>
+                      <!-- Edit button -->
+                      <button type="button"
+                              class="table-btn table-btn-edit fac-edit-btn"
+                              data-id="{{ f.id }}"
+                              data-code="{{ f.faculty_id }}"
+                              data-name="{{ f.name }}">
+                        <img src="{{ url_for('static', filename='img/pen.png') }}" class="row-icon" />
+                      </button>
+
+                      <!-- Delete button (AJAX via JS) -->
+                      <button type="button"
+                              class="table-btn table-btn-delete fac-delete-btn"
+                              data-id="{{ f.id }}"
+                              data-name="{{ f.name }}">
+                        <img src="{{ url_for('static', filename='img/bin.png') }}" class="row-icon" />
+                      </button>
+                    </td>
+                  </tr>
+                  {% endfor %}
+                {% else %}
+                  <tr>
+                    <td colspan="4" class="empty-row">
+                      No faculties found. Click “Add new faculty” to create one.
+                    </td>
+                  </tr>
+                {% endif %}
+              </tbody>
+            </table>
+          </div>
+        </div>
+      </section>
+
+    </main>
+  </div>
+
+  <script src="{{ url_for('static', filename='js/admin_faculties.js') }}"></script>
+</body>
+</html>

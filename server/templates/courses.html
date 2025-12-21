@@ -1,0 +1,235 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <title>Classync – Courses</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+
+  <!-- Poppins font -->
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link
+    href="https://fonts.googleapis.com/css2?family=Poppins:wght@300;400;500;600;700&display=swap"
+    rel="stylesheet"
+  />
+
+  <!-- Shared layout styles (sidebar, topbar, cards, etc.) -->
+  <link rel="stylesheet"
+        href="{{ url_for('static', filename='css/dashboard_main.css') }}">
+
+  <!-- Page-specific styles -->
+  <link rel="stylesheet"
+        href="{{ url_for('static', filename='css/courses.css') }}">
+</head>
+<body>
+
+<div class="app-wrapper">
+  <!-- ========== SIDEBAR ========== -->
+  <aside class="sidebar">
+    <div class="sidebar-header">
+      <button class="logo-btn" id="sidebarToggle" aria-label="Toggle sidebar">
+        <div class="logo-mark">C</div>
+        <span class="logo-text classync-brand">Classync</span>
+      </button>
+    </div>
+
+    <nav class="sidebar-menu">
+      <!-- change href later to your real routes -->
+      <a href="{{ url_for('dashboard') }}" class="menu-item">
+        <span class="menu-icon">🏠</span>
+        <span class="menu-label">Dashboard</span>
+      </a>
+      <a href="{{ url_for('courses') }}" class="menu-item active">
+        <span class="menu-icon">📚</span>
+        <span class="menu-label">Courses</span>
+      </a>
+      <a href="{{ url_for('lecturer_analysis') }}" class="menu-item">
+        <span class="menu-icon">📊</span>
+        <span class="menu-label">Analysis</span>
+      </a>
+    </nav>
+
+    <div class="sidebar-bottom">
+      <a href="{{ url_for('lecturer_settings') }}" class="menu-item">
+        <span class="menu-icon">⚙️</span>
+        <span class="menu-label">Settings</span>
+      </a>
+    </div>
+  </aside>
+
+  <!-- ========== MAIN AREA ========== -->
+  <div class="main-wrap">
+    <!-- Top navbar (REUSED from dashboard) -->
+    <header class="topbar">
+      <div class="topbar-center">
+        <h1 class="page-title">Courses</h1>
+      </div>
+
+      <div class="topbar-right">
+        <button id="notifToggle" class="icon-btn" aria-label="Notifications">
+          🔔
+        </button>
+
+        <div class="user-info">
+          <div class="avatar">
+            {{ current_user.initials if current_user else 'CS' }}
+          </div>
+          <div class="user-text">
+            <div class="user-name">
+              {{ current_user.name if current_user else 'Charles Santos' }}
+            </div>
+            <div class="user-role">
+              Lecturer
+            </div>
+          </div>
+        </div>
+
+        <a href="{{ url_for('logout') }}" class="icon-btn" aria-label="Logout">
+          ⏻
+        </a>
+      </div>
+    </header>
+
+    <!-- ========== CONTENT ========== -->
+    <main class="dashboard-content courses-page">
+      <!-- top mini nav like in your sketch -->
+      <section class="courses-toolbar">
+        <div class="courses-toolbar-left">
+          <h2 class="courses-title">Course Overview</h2>
+        </div>
+
+        <div class="courses-toolbar-right">
+
+          <div class="search-wrapper" data-label="Search">
+            <input type="text" id="courseSearch"
+                   class="courses-search-input"
+                   placeholder="Search" />
+          </div>
+
+          <div class="sort-wrapper" data-label="Sort">
+            <select class="courses-select" id="sortSelect">
+              <option value="name">Sort by course name</option>
+              <option value="code">Sort by course code</option>
+            </select>
+          </div>
+
+          <div class="view-toggle" data-label="View">
+            <button class="view-btn active" data-view="card">Card</button>
+            <button class="view-btn" data-view="list">List</button>
+          </div>
+        </div>
+      </section>
+
+      <div class="courses-divider"></div>
+
+      <!-- ========== CARD GRID ========== -->
+      <section id="coursesGrid" class="courses-grid">
+        {% if classes %}
+          {% for c in classes %}
+            {% set color_class = ['course-card-yellow',
+                                  'course-card-green',
+                                  'course-card-purple',
+                                  'course-card-red'][loop.index0 % 4] %}
+
+            <a href="{{ url_for('summary') }}?class_id={{ c.id }}"
+              class="course-card-link">
+              <article class="course-card {{ color_class }}"
+                      data-name="{{ c.name|lower }}"
+                      data-code="{{ c.id }}">
+                <header class="course-card-header">
+                  <span class="course-code">{{ c.id }}</span>
+                </header>
+
+                <div class="course-card-body">
+                  <h3 class="course-name">
+                    {{ c.name|upper }}
+                  </h3>
+
+                  {% if c.dept_name %}
+                    <p class="course-dept">{{ c.dept_name|upper }}</p>
+                  {% else %}
+                    <p class="course-dept">-</p>
+                  {% endif %}
+                </div>
+              </article>
+            </a>
+          {% endfor %}
+        {% else %}
+          <p style="font-size:0.9rem;color:#6b7280;">
+            You have no courses yet. Create a class first.
+          </p>
+        {% endif %}
+      </section>
+
+      <!-- ====== LIST VIEW (hidden by default, JS will toggle) ====== -->
+      <section class="courses-list d-none" id="coursesList">
+        <table class="courses-table">
+          <thead>
+          <tr>
+            <th>Course code</th>
+            <th>Course name</th>
+            <th>Department</th>
+          </tr>
+          </thead>
+          <tbody>
+            {% if classes %}
+              {% for c in classes %}
+                <tr>
+                  <td>{{ c.id }}</td>
+                  <td>{{ c.name }}</td>
+                  <td>{{ c.dept_name or '-' }}</td>
+                </tr>
+              {% endfor %}
+            {% else %}
+              <tr>
+                <td colspan="3" style="padding:0.75rem;color:#6b7280;font-size:0.9rem;">
+                  You have no courses yet.
+                </td>
+              </tr>
+            {% endif %}
+          </tbody>
+        </table>
+      </section>
+    </main>
+    <!-- ========== NOTIFICATION POPUP (same as dashboard) ========== -->
+    <aside id="notifPanel" class="notif-panel" aria-hidden="true">
+      <header class="notif-header">
+        <h3>Notifications</h3>
+        <button id="notifClearBtn" class="text-link small">Clear all</button>
+      </header>
+      <ul class="notif-list">
+        {% if notifications %}
+          {% for n in notifications %}
+            <li class="notif-item">
+              <span class="notif-dot {{ n.level }}"></span>
+
+              <div class="notif-main">
+                {% if n.type %}
+                  <span class="notif-tag">
+                    {{ n.type.replace('_', ' ')|title }}
+                  </span>
+                {% endif %}
+                <span class="notif-message">{{ n.message }}</span>
+                <span class="notif-time">
+                  {{ n.created_at[11:16] if n.created_at }}
+                </span>
+              </div>
+            </li>
+          {% endfor %}
+        {% else %}
+          <li>No notifications yet.</li>
+        {% endif %}
+      </ul>
+      <footer class="notif-footer">
+        <button class="text-link small">View all</button>
+      </footer>
+    </aside>
+  </div>
+</div>
+
+<!-- shared JS that handles sidebar toggle, topbar, etc. -->
+<script src="{{ url_for('static', filename='js/dashboard_main.js') }}"></script>
+<!-- page-specific JS for courses page -->
+<script src="{{ url_for('static', filename='js/courses.js') }}"></script>
+</body>
+</html>

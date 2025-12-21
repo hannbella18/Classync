@@ -1,0 +1,13 @@
+train: "D:/vscode project/train/images"
+val:   "D:/vscode project/valid/images"
+test:  "D:/vscode project/test/images"
+
+nc: 2
+names: ['Awake', 'Drowsy']
+
+roboflow:
+  workspace: ctufinalthesis
+  project: drowsinessdetectionyolov8-test2
+  version: 9
+  license: CC BY 4.0
+  url: https://universe.roboflow.com/ctufinalthesis/drowsinessdetectionyolov8-test2/dataset/9

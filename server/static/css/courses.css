@@ -1,0 +1,323 @@
+/* ==========================================================
+   COURSES PAGE – BLUE + WHITE THEME (FINAL STABLE VERSION)
+   ========================================================== */
+
+/* ---------- PAGE BACKGROUND ---------- */
+
+.courses-page {
+  padding: 1.75rem 2rem 2rem;
+  background: linear-gradient(180deg, #f4f7ff 0%, #edf2ff 40%, #f7f9ff 100%);
+}
+
+
+/* ==========================================================
+   TOP TOOLBAR
+   ========================================================== */
+
+.courses-toolbar {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-end;
+  gap: 1.25rem;
+  margin-bottom: 0.75rem;
+}
+
+.courses-title {
+  font-size: 1.2rem;
+  font-weight: 700;
+  color: #6e7fa5;
+}
+
+
+/* ---------- RIGHT TOOLBAR GROUP ---------- */
+
+.courses-toolbar-right {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-end;
+  justify-content: flex-end;
+  gap: 1rem;
+}
+
+
+/* ---------- WRAPPERS WITH LABEL ---------- */
+
+.search-wrapper,
+.sort-wrapper,
+.view-wrapper {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+}
+
+.filter-wrapper::before,
+.search-wrapper::before,
+.sort-wrapper::before,
+.view-wrapper::before {
+  content: attr(data-label);
+  font-size: 0.65rem;
+  font-weight: 700;
+  letter-spacing: 0.05em;
+  color: #90a0c9;
+  margin-left: 4px;
+  margin-bottom: 4px;
+  text-transform: uppercase;
+}
+
+
+/* ==========================================================
+   WHITE + BLUE INPUTS (Filter / Search / Sort)
+   ========================================================== */
+
+.courses-select,
+.courses-search-input {
+  background: #ffffff;
+  border: 2px solid #d7e1ff;
+  border-radius: 999px;
+  padding: 0.48rem 1rem;
+  font-size: 0.82rem;
+  color: #014db3;
+  min-width: 160px;
+  font-weight: 500;
+  box-shadow: 0 6px 16px rgba(2, 43, 114, 0.08);
+  transition: all 0.2s ease;
+}
+
+.courses-search-input::placeholder {
+  color: #9fb0d8;
+}
+
+/* Hover */
+.courses-select:hover,
+.courses-search-input:hover {
+  background: #f2f6ff;
+  border-color: #c4d3ff;
+}
+
+/* Focus */
+.courses-select:focus,
+.courses-search-input:focus {
+  outline: none;
+  border-color: #6f8cfd;
+  box-shadow: 0 0 0 3px rgba(111, 140, 253, 0.35);
+}
+
+
+/* ---------- SEARCH ICON INSIDE BOX ---------- */
+
+.search-wrapper {
+  position: relative;
+}
+
+.search-wrapper::after {
+  content: "🔍";
+  position: absolute;
+  right: 16px;
+  top: 67%;
+  transform: translateY(-50%);
+  font-size: 0.9rem;
+  opacity: 0.85;
+  pointer-events: none;
+}
+
+.courses-search-input {
+  padding-right: 2.5rem;
+}
+
+
+/* ==========================================================
+   VIEW TOGGLE (CARD | LIST)
+   ========================================================== */
+
+.view-toggle {
+  display: flex;
+  align-items: center;
+  background: #ffffff;
+  border: 2px solid #d7e1ff;
+  border-radius: 999px;
+  padding: 3px;
+  box-shadow: 0 6px 16px rgba(2, 43, 114, 0.08);
+  gap: 0.25rem;
+}
+
+.view-btn {
+  padding: 0.38rem 0.9rem;
+  border-radius: 999px;
+  background: transparent;
+  border: none;
+  cursor: pointer;
+  font-size: 0.8rem;
+  color: #6477a3;
+  transition: all 0.2s ease;
+}
+
+/* Hover */
+.view-btn:hover {
+  background: #eef3ff;
+  color: #014db3;
+}
+
+/* Active */
+.view-btn.active {
+  background: #014db3;
+  color: #ffffff;
+}
+
+
+/* ---------- DIVIDER UNDER TOOLBAR ---------- */
+
+.courses-divider {
+  border-top: 1px solid #d1dbff;
+  margin: 0.9rem 0 1.4rem;
+}
+
+
+
+/* ==========================================================
+   COURSE CARDS (BLUE GRADIENT)
+   ========================================================== */
+
+.courses-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
+  gap: 1rem;
+}
+
+.course-card {
+  border-radius: 24px;
+  padding: 1.1rem 1.2rem 1.3rem;
+  color: #ffffff;
+  display: flex;
+  flex-direction: column;
+  justify-content: space-between;
+  box-shadow: 0 14px 30px rgba(10, 42, 102, 0.35);
+  transition: 0.16s ease;
+  height: 100%;
+}
+
+/* Gradient colors — staying same */
+.course-card-yellow {
+  background: linear-gradient(135deg, #014db3, #456cd7);
+}
+
+.course-card-green {
+  background: linear-gradient(135deg, #456cd7, #6f8cfd);
+}
+
+.course-card-purple {
+  background: linear-gradient(135deg, #6f8cfd, #96afff);
+}
+
+.course-card-red {
+  background: linear-gradient(135deg, #014db3, #6f8cfd);
+}
+
+.course-card:hover {
+  transform: translateY(-4px);
+  box-shadow: 0 18px 40px rgba(5, 34, 93, 0.45);
+}
+
+.course-card-header {
+  font-size: 0.82rem;
+  font-weight: 600;
+  text-transform: uppercase;
+  margin-bottom: 0.6rem;
+  opacity: 0.95;
+}
+
+.course-name {
+  font-size: 0.95rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  margin-bottom: 0.35rem;
+}
+
+.course-name-en {
+  font-size: 0.8rem;
+  font-weight: 400;
+}
+
+.course-card-body {
+  display: flex;
+  flex-direction: column;
+  justify-content: space-between;
+  height: 100%;
+}
+
+.course-dept {
+  font-size: 0.7rem;
+  letter-spacing: 0.09em;
+  text-transform: uppercase;
+  opacity: 0.92;
+  margin-top: auto;
+}
+
+.course-card-link {
+  display: block;
+  text-decoration: none;
+  color: inherit;
+}
+
+/* optional: make hover nicer */
+.course-card-link:hover .course-card {
+  transform: translateY(-4px);
+  box-shadow: 0 22px 45px rgba(15, 23, 42, 0.2);
+}
+
+
+/* ==========================================================
+   LIST VIEW TABLE
+   ========================================================== */
+
+.courses-list {
+  margin-top: 1.5rem;
+}
+
+.courses-table {
+  width: 100%;
+  border-collapse: collapse;
+  background: #ffffff;
+  border-radius: 18px;
+  overflow: hidden;
+  box-shadow: 0 10px 24px rgba(15, 23, 42, 0.12);
+  font-size: 0.85rem;
+}
+
+.courses-table th,
+.courses-table td {
+  padding: 0.8rem 1rem;
+  border-bottom: 1px solid #e2e8ff;
+}
+
+.courses-table th {
+  background: #f3f6ff;
+  font-weight: 600;
+  color: #1e2a4a;
+}
+
+.courses-table tbody tr:hover {
+  background-color: #eef3ff;
+}
+
+
+/* helper */
+.d-none {
+  display: none !important;
+}
+
+
+/* ==========================================================
+   RESPONSIVE
+   ========================================================== */
+
+@media (max-width: 900px) {
+  .courses-toolbar {
+    flex-direction: column;
+    align-items: flex-start;
+  }
+
+  .courses-toolbar-right {
+    justify-content: flex-start;
+    gap: 1rem;
+  }
+}

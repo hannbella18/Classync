@@ -1,0 +1,332 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <title>Classync – Class Summary</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+
+  <!-- Poppins font -->
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link
+    href="https://fonts.googleapis.com/css2?family=Poppins:wght@300;400;500;600;700&display=swap"
+    rel="stylesheet"
+  />
+
+  <!-- Shared layout styles (sidebar, topbar, cards, etc.) -->
+  <link rel="stylesheet"
+        href="{{ url_for('static', filename='css/dashboard_main.css') }}">
+
+  <!-- Page-specific styles -->
+  <link rel="stylesheet"
+        href="{{ url_for('static', filename='css/summary.css') }}">
+</head>
+<body>
+
+<div class="app-wrapper">
+  <!-- ========== SIDEBAR ========== -->
+  <aside class="sidebar">
+    <div class="sidebar-header">
+      <button class="logo-btn" id="sidebarToggle" aria-label="Toggle sidebar">
+        <div class="logo-mark">C</div>
+        <span class="logo-text classync-brand">Classync</span>
+      </button>
+    </div>
+
+    <nav class="sidebar-menu">
+      <a href="{{ url_for('dashboard') }}" class="menu-item">
+        <span class="menu-icon">🏠</span>
+        <span class="menu-label">Dashboard</span>
+      </a>
+      <a href="{{ url_for('courses') }}" class="menu-item active">
+        <span class="menu-icon">📚</span>
+        <span class="menu-label">Courses</span>
+      </a>
+      <a href="{{ url_for('lecturer_analysis') }}" class="menu-item">
+        <span class="menu-icon">📊</span>
+        <span class="menu-label">Analysis</span>
+      </a>
+    </nav>
+
+    <div class="sidebar-bottom">
+      <a href="{{ url_for('lecturer_settings') }}" class="menu-item">
+        <span class="menu-icon">⚙️</span>
+        <span class="menu-label">Settings</span>
+      </a>
+    </div>
+  </aside>
+
+  <!-- ========== MAIN AREA ========== -->
+  <div class="main-wrap">
+    <!-- Top navbar -->
+    <header class="topbar">
+      <div class="topbar-center">
+        <h1 class="page-title" id="summaryClassTitle">
+          {{ class_code }} — {{ class_name }}
+        </h1>
+      </div>
+
+      <div class="topbar-right">
+        <button id="notifToggle" class="icon-btn" aria-label="Notifications">
+          🔔
+        </button>
+
+        <div class="user-info">
+          <div class="avatar">
+            {{ current_user.initials if current_user else 'CS' }}
+          </div>
+          <div class="user-text">
+            <div class="user-name">
+              {{ current_user.name if current_user else 'Charles Santos' }}
+            </div>
+            <div class="user-role">
+              Lecturer
+            </div>
+          </div>
+        </div>
+
+        <a href="{{ url_for('logout') }}" class="icon-btn" aria-label="Logout">
+          ⏻
+        </a>
+      </div>
+    </header>
+
+    <!-- ========== CONTENT ========== -->
+    <main class="dashboard-content summary-page">
+
+      <!-- ===== Hero / 3 stat cards ===== -->
+      <section
+        class="card summary-hero-card"
+        id="summaryHero"
+        data-class-id="{{ class_code }}"
+      >
+        <div class="summary-hero-header">
+          <div>
+            <div class="summary-eyebrow">Class overview</div>
+            <h2 class="summary-hero-title">Latest session</h2>
+            <p class="summary-hero-sub">
+              Live engagement and attendance snapshot for this class.
+            </p>
+          </div>
+        </div>
+
+        <div class="summary-stats-row">
+          <div class="summary-stat">
+            <div class="summary-stat-label">Total students</div>
+            <div class="summary-stat-value" id="statTotalStudents">0</div>
+            <div class="summary-stat-caption">
+              Registered in this class
+            </div>
+          </div>
+
+          <div class="summary-stat">
+            <div class="summary-stat-label">Average engagement</div>
+            <div class="summary-stat-value" id="statAvgEngagement">0%</div>
+            <div class="summary-stat-caption">
+              Recent window (all students)
+            </div>
+          </div>
+
+          <div class="summary-stat">
+            <div class="summary-stat-label">Attendance</div>
+            <div class="summary-stat-value" id="statAttendance">--%</div>
+            <div class="summary-stat-caption">
+              Current session / 14-week view
+            </div>
+          </div>
+
+          <!-- Student join link row -->
+          <div class="summary-join-row">
+            <!-- Row 1 -->
+            <div class="summary-join-label">Student join link</div>
+            <!-- Row 2 -->
+            <div class="summary-join-caption">
+              Share this link with your students so they can join this class and set up smart attendance via face recognition.
+            </div>
+            <!-- Row 3 -->
+            <div class="summary-join-actions">
+              <input
+                type="text"
+                id="joinLinkInput"
+                class="summary-join-input"
+                value="{{ url_for('join_class_page', class_id=class_code, _external=True) }}"
+                readonly
+              />
+              <button
+                type="button"
+                class="btn-secondary summary-join-copy-btn"
+                id="copyJoinLinkBtn"
+              >
+                Copy link
+              </button>
+            </div>
+          </div>
+
+        </div>
+      </section>
+
+      <!-- ===== Session selector (OUTSIDE hero card) ===== -->
+      <section class="summary-controls">
+        <div class="summary-control-group">
+          <label for="sessionSelect">Session</label>
+          <select id="sessionSelect" class="summary-select">
+            <!-- backend / JS will replace options later -->
+            <option value="latest">Latest session</option>
+          </select>
+        </div>
+
+        <div class="summary-control-actions">
+          <button class="btn-primary" data-role="summary-refresh">
+            Refresh
+          </button>
+          <button class="btn-primary" id="downloadCsvTop">
+            Download CSV
+          </button>
+        </div>
+      </section>
+
+      <!-- ===== Student Engagement ===== -->
+      <section class="card summary-section-card">
+        <header class="summary-section-header">
+          <h2>Student Engagement</h2>
+        </header>
+
+        <div class="summary-table-wrapper">
+          <table class="summary-table" id="engagementTable">
+            <!-- Column widths -->
+            <colgroup>
+              <!-- small -->
+              <col style="width: 5%;">   <!-- No. -->
+              <!-- normal -->
+              <col style="width: 9%;">  <!-- Student ID -->
+              <!-- a bit wide -->
+              <col style="width: 14%;">  <!-- Name -->
+              <!-- wide (bar indicator) -->
+              <col style="width: 16%;">  <!-- Engagement score -->
+              <!-- normal -->
+              <col style="width: 10%;">  <!-- Behaviour -->
+              <!-- normal -->
+              <col style="width: 11%;">  <!-- Average engagement -->
+              <!-- wide (present/late/absent) -->
+              <col style="width: 15%;">  <!-- Attendance -->
+              <!-- normal -->
+              <col style="width: 9%;">   <!-- Average attendance -->
+              <!-- normal -->
+              <col style="width: 10%;">  <!-- Actions -->
+            </colgroup>
+
+            <thead>
+            <tr>
+              <th>No.</th>
+              <th>Student ID</th>
+              <th>Name</th>
+              <th>Engagement score</th>
+              <th>Behaviour</th>
+              <th>Average engagement</th>
+              <th>Attendance</th>
+              <th>Average attendance</th>
+              <th>Actions</th>
+            </tr>
+            </thead>
+            <tbody id="engagementBody">
+              <tr class="summary-empty-row">
+                <!-- 9 columns -->
+                <td colspan="9">No data yet for this session.</td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+      </section>
+
+      <!-- ===== Live Roster ===== -->
+      <section class="card summary-section-card">
+        <header class="summary-section-header live-header">
+          <h2>Live Roster</h2>
+          <div class="live-header-right">
+            <button class="btn-outline" data-role="live-refresh">
+              Refresh
+            </button>
+            <span class="live-updated" id="liveUpdatedLabel">
+              updated just now
+            </span>
+          </div>
+        </header>
+
+        <div class="summary-table-wrapper">
+          <table class="summary-table" id="liveTable">
+            <!-- Column widths -->
+            <colgroup>
+              <!-- small -->
+              <col style="width: 8%;">   <!-- No. -->
+              <!-- normal -->
+              <col style="width: 20%;">  <!-- Student ID -->
+              <!-- a bit wide (name) -->
+              <col style="width: 34%;">  <!-- Student name -->
+              <!-- normal -->
+              <col style="width: 18%;">  <!-- Status -->
+              <!-- normal -->
+              <col style="width: 20%;">  <!-- Last seen -->
+            </colgroup>
+
+            <thead>
+            <tr>
+              <th>No.</th>
+              <th>Student ID</th>
+              <th>Student name</th>
+              <th>Status</th>
+              <th>Last seen</th>
+            </tr>
+            </thead>
+            <tbody id="liveBody">
+              <tr class="summary-empty-row">
+                <!-- 5 columns -->
+                <td colspan="5">No students yet</td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+
+      </section>
+    </main>
+    <!-- ========== NOTIFICATION POPUP (same as dashboard) ========== -->
+    <aside id="notifPanel" class="notif-panel" aria-hidden="true">
+      <header class="notif-header">
+        <h3>Notifications</h3>
+        <button id="notifClearBtn" class="text-link small">Clear all</button>
+      </header>
+      <ul class="notif-list">
+        {% if notifications %}
+          {% for n in notifications %}
+            <li class="notif-item">
+              <span class="notif-dot {{ n.level }}"></span>
+
+              <div class="notif-main">
+                {% if n.type %}
+                  <span class="notif-tag">
+                    {{ n.type.replace('_', ' ')|title }}
+                  </span>
+                {% endif %}
+                <span class="notif-message">{{ n.message }}</span>
+                <span class="notif-time">
+                  {{ n.created_at[11:16] if n.created_at }}
+                </span>
+              </div>
+            </li>
+          {% endfor %}
+        {% else %}
+          <li>No notifications yet.</li>
+        {% endif %}
+      </ul>
+      <footer class="notif-footer">
+        <button class="text-link small">View all</button>
+      </footer>
+    </aside>
+  </div>
+</div>
+
+<!-- Sidebar + topbar behaviour (same as dashboard) -->
+<script src="{{ url_for('static', filename='js/dashboard_main.js') }}"></script>
+<!-- Page specific JS -->
+<script src="{{ url_for('static', filename='js/summary.js') }}"></script>
+</body>
+</html>

@@ -1,0 +1,644 @@
+/* ===== Base layout ===== */
+
+* {
+  box-sizing: border-box;
+  margin: 0;
+  padding: 0;
+}
+
+body {
+  font-family: "Poppins", sans-serif;
+  background: radial-gradient(circle at top left, #e3f2fd 0, #f5f7fb 40%, #f3f4f6 100%);
+  color: #1f2933;
+}
+
+/* Smooth scroll + nicer transitions for anchor links if any */
+html {
+  scroll-behavior: smooth;
+}
+
+.page-wrapper {
+  min-height: 100vh;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 32px 16px;
+}
+
+.page-container {
+  width: 100%;
+  max-width: 980px;
+  background: #ffffff;
+  border-radius: 22px;
+  box-shadow: 0 18px 40px rgba(15, 23, 42, 0.12);
+  padding: 26px 26px 30px;
+  border: 1px solid rgba(15, 23, 42, 0.03);
+  animation: cardFloat 0.9s ease-out;
+}
+
+/* ===== Header & branding ===== */
+
+.page-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 18px;
+}
+
+.brand {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.brand-logo {
+  width: 38px;
+  height: 38px;
+  border-radius: 14px;
+  background: linear-gradient(135deg, #1565c0, #7c3aed);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: #ffffff;
+  font-weight: 700;
+  font-size: 20px;
+  box-shadow: 0 8px 20px rgba(37, 99, 235, 0.48);
+}
+
+.brand-text {
+  display: flex;
+  flex-direction: column;
+}
+
+.brand-name {
+  font-size: 20px;
+  font-weight: 600;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: #0f172a;
+}
+
+.brand-tagline {
+  font-size: 11px;
+  color: #6b7280;
+}
+
+.student-pill {
+  padding: 6px 12px;
+  border-radius: 999px;
+  background: #e3f2fd;
+  color: #1565c0;
+  font-size: 12px;
+  font-weight: 500;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.student-pill::before {
+  content: "●";
+  font-size: 8px;
+}
+
+/* ===== Hero section ===== */
+
+.hero {
+  margin-bottom: 14px;
+}
+
+.hero-title {
+  font-size: 24px;
+  font-weight: 600;
+  margin-bottom: 6px;
+  color: #0f172a;
+}
+
+.hero-subtitle {
+  font-size: 14px;
+  color: #4b5563;
+  max-width: 620px;
+}
+
+/* ===== Info box ===== */
+
+.info-box {
+  margin-top: 10px;
+  margin-bottom: 18px;
+  padding: 12px 14px;
+  border-radius: 14px;
+  background: #fff7e6;
+  border: 1px solid #fed7aa;
+  font-size: 13px;
+  color: #92400e;
+  position: relative;
+  overflow: hidden;
+}
+
+.info-box::before {
+  content: "!";
+  position: absolute;
+  top: 12px;
+  right: 12px;
+  width: 20px;
+  height: 20px;
+  border-radius: 999px;
+  border: 1px solid #f97316;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 12px;
+  color: #f97316;
+  background: #fff;
+}
+
+.info-title {
+  font-weight: 600;
+  margin-bottom: 2px;
+}
+
+/* ===== Steps & sections ===== */
+
+.step-section {
+  margin-top: 18px;
+}
+
+.step-heading {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin-bottom: 6px;
+}
+
+.step-badge {
+  width: 28px;
+  height: 28px;
+  border-radius: 999px;
+  background: linear-gradient(135deg, #1565c0, #1e88e5);
+  color: #ffffff;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 14px;
+  font-weight: 600;
+  box-shadow: 0 6px 12px rgba(37, 99, 235, 0.55);
+}
+
+.step-title-text {
+  font-size: 18px;
+  font-weight: 600;
+  color: #111827;
+}
+
+.section-desc {
+  font-size: 13px;
+  color: #4b5563;
+  margin-bottom: 10px;
+}
+
+/* ===== Download card ===== */
+
+.download-card {
+  margin-top: 6px;
+  margin-bottom: 16px;
+  padding: 16px 16px 18px;
+  border-radius: 16px;
+  background: linear-gradient(135deg, #1565c0, #4f46e5);
+  color: #ffffff;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 14px;
+  justify-content: space-between;
+  align-items: center;
+  position: relative;
+  overflow: hidden;
+}
+
+.download-card::after {
+  content: "";
+  position: absolute;
+  right: -40px;
+  bottom: -40px;
+  width: 140px;
+  height: 140px;
+  border-radius: 50%;
+  background: radial-gradient(circle, rgba(255, 255, 255, 0.4) 0, transparent 65%);
+  opacity: 0.6;
+}
+
+.download-text {
+  max-width: 440px;
+  position: relative;
+  z-index: 1;
+}
+
+.download-title {
+  font-size: 16px;
+  font-weight: 600;
+  margin-bottom: 4px;
+}
+
+.download-desc {
+  font-size: 13px;
+  opacity: 0.95;
+}
+
+.download-btn {
+  border: none;
+  background: #ffffff;
+  color: #1565c0;
+  padding: 10px 18px;
+  border-radius: 999px;
+  font-size: 14px;
+  font-weight: 600;
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  text-decoration: none;
+  box-shadow: 0 12px 30px rgba(15, 23, 42, 0.35);
+  white-space: nowrap;
+  position: relative;
+  z-index: 1;
+  transition: transform 0.18s ease, box-shadow 0.18s ease;
+}
+
+.download-btn span.icon {
+  font-size: 18px;
+  line-height: 1;
+}
+
+.download-btn:hover {
+  transform: translateY(-2px) scale(1.02);
+  box-shadow: 0 14px 36px rgba(15, 23, 42, 0.45);
+}
+
+/* ===== Steps grid ===== */
+
+.steps-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(230px, 1fr));
+  gap: 14px;
+  margin-bottom: 10px;
+  margin-top: 8px;
+}
+
+.step-card {
+  background: #f9fafb;
+  border-radius: 14px;
+  padding: 12px 14px 14px;
+  border: 1px solid #e5e7eb;
+  display: flex;
+  gap: 10px;
+  position: relative;
+  overflow: hidden;
+}
+
+.step-number {
+  width: 24px;
+  height: 24px;
+  border-radius: 999px;
+  background: #1565c0;
+  color: #ffffff;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 12px;
+  font-weight: 600;
+  flex-shrink: 0;
+  margin-top: 2px;
+}
+
+.step-content-title {
+  font-size: 14px;
+  font-weight: 600;
+  margin-bottom: 2px;
+  color: #111827;
+}
+
+.step-content-text {
+  font-size: 13px;
+  color: #4b5563;
+}
+
+/* Hover animation for cards */
+.hover-pop {
+  transition: transform 0.18s ease, box-shadow 0.18s ease, border-color 0.18s ease;
+}
+
+.hover-pop:hover {
+  transform: translateY(-3px);
+  box-shadow: 0 12px 28px rgba(15, 23, 42, 0.12);
+  border-color: #bfdbfe;
+}
+
+/* ===== Tip boxes ===== */
+
+.tip-box {
+  margin-top: 6px;
+  padding: 10px 12px;
+  border-radius: 12px;
+  background: #eff6ff;
+  border: 1px dashed #bfdbfe;
+  font-size: 12px;
+  color: #1e40af;
+}
+
+.tip-box.important {
+  background: #ecfdf3;
+  border-color: #bbf7d0;
+  color: #166534;
+}
+
+/* ===== Footer ===== */
+
+.footer-note {
+  font-size: 12px;
+  color: #6b7280;
+  text-align: center;
+  margin-top: 18px;
+}
+
+/* ===== Video tutorial section ===== */
+
+.video-section {
+  margin-top: 20px;
+}
+
+.video-title {
+  font-size: 17px;
+  font-weight: 600;
+  color: #111827;
+  margin-bottom: 6px;
+}
+
+.video-wrapper {
+  margin-top: 8px;
+  border-radius: 16px;
+  overflow: hidden;
+  border: 1px solid #e5e7eb;
+  box-shadow: 0 10px 24px rgba(15, 23, 42, 0.08);
+  background: #000;
+}
+
+.video-player {
+  display: block;
+  width: 100%;
+  max-height: 420px;
+}
+
+/* ===== FAQ section ===== */
+
+.faq-section {
+  margin-top: 20px;
+}
+
+.faq-title {
+  font-size: 17px;
+  font-weight: 600;
+  color: #111827;
+  margin-bottom: 4px;
+}
+
+.faq-list {
+  margin-top: 8px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.faq-item {
+  border-radius: 12px;
+  border: 1px solid #e5e7eb;
+  background: #f9fafb;
+  padding: 8px 10px;
+}
+
+.faq-question {
+  list-style: none;
+  cursor: pointer;
+  font-size: 13px;
+  font-weight: 600;
+  color: #111827;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.faq-question::-webkit-details-marker {
+  display: none;
+}
+
+.faq-question::after {
+  content: "▾";
+  font-size: 11px;
+  color: #6b7280;
+  margin-left: 8px;
+}
+
+.faq-item[open] .faq-question::after {
+  content: "▴";
+}
+
+.faq-answer {
+  margin-top: 4px;
+  font-size: 12px;
+  color: #4b5563;
+  padding-right: 2px;
+}
+
+/* ===== Extension status checker ===== */
+
+.status-section {
+  margin-top: 22px;
+}
+
+.status-title {
+  font-size: 17px;
+  font-weight: 600;
+  color: #111827;
+  margin-bottom: 4px;
+}
+
+.status-card {
+  margin-top: 8px;
+  padding: 12px 14px;
+  border-radius: 14px;
+  background: #f9fafb;
+  border: 1px solid #e5e7eb;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.status-button {
+  align-self: flex-start;
+  border: none;
+  border-radius: 999px;
+  padding: 8px 16px;
+  font-size: 13px;
+  font-weight: 600;
+  background: #1565c0;
+  color: #ffffff;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  cursor: pointer;
+  box-shadow: 0 8px 20px rgba(37, 99, 235, 0.35);
+  transition: transform 0.16s ease, box-shadow 0.16s ease;
+}
+
+.status-button:hover {
+  transform: translateY(-1px);
+  box-shadow: 0 10px 26px rgba(37, 99, 235, 0.45);
+}
+
+.status-text {
+  font-size: 12px;
+  margin: 0;
+}
+
+.status-muted {
+  color: #6b7280;
+}
+
+.status-checking {
+  color: #1d4ed8;
+}
+
+.status-ok {
+  color: #15803d;
+}
+
+.status-warning {
+  color: #b45309;
+}
+
+.status-error {
+  color: #b91c1c;
+}
+
+.status-note {
+  margin-top: 4px;
+  font-size: 11px;
+  color: #6b7280;
+}
+
+/* Mobile tweaks for new sections */
+@media (max-width: 768px) {
+  .video-player {
+    max-height: 260px;
+  }
+
+  .status-card {
+    padding: 10px 12px;
+  }
+
+  .status-button {
+    width: 100%;
+    justify-content: center;
+  }
+}
+
+/* ===== Animations ===== */
+
+@keyframes cardFloat {
+  from {
+    opacity: 0;
+    transform: translateY(10px) scale(0.98);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
+}
+
+@keyframes fadeUp {
+  from {
+    opacity: 0;
+    transform: translateY(12px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@keyframes slideIn {
+  from {
+    opacity: 0;
+    transform: translateX(-10px);
+  }
+  to {
+    opacity: 1;
+    transform: translateX(0);
+  }
+}
+
+.fade-up {
+  animation: fadeUp 0.6s ease-out both;
+}
+
+.slide-in {
+  animation: slideIn 0.6s ease-out both;
+}
+
+.delay-1 {
+  animation-delay: 0.08s;
+}
+
+.delay-2 {
+  animation-delay: 0.16s;
+}
+
+.delay-3 {
+  animation-delay: 0.24s;
+}
+
+/* ===== Responsive tweaks ===== */
+
+@media (max-width: 768px) {
+  .page-wrapper {
+    padding: 18px 10px;
+    align-items: flex-start;
+  }
+
+  .page-container {
+    padding: 18px 16px 22px;
+    border-radius: 18px;
+  }
+
+  .page-header {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 8px;
+  }
+
+  .hero-title {
+    font-size: 20px;
+  }
+
+  .download-card {
+    align-items: flex-start;
+  }
+
+  .download-btn {
+    width: 100%;
+    justify-content: center;
+  }
+
+  .steps-grid {
+    grid-template-columns: 1fr;
+  }
+}
+
+@media (max-width: 480px) {
+  .brand-name {
+    font-size: 18px;
+  }
+
+  .brand-logo {
+    width: 34px;
+    height: 34px;
+    font-size: 18px;
+  }
+}

@@ -1,0 +1,34 @@
+# Python virtual env
+.venv/
+venv/
+server/.venv311/
+
+# Python cache
+__pycache__/
+*.pyc
+
+# OS / editor
+.DS_Store
+.vscode/
+
+# Logs / temp
+*.log
+*.tmp
+
+# Ignore heavy models and training logs
+yolov8n.pt
+runs/
+
+# Ignore large datasets
+train/
+test/
+valid/
+
+# Ignore junk files
+*.jpeg
+*.jpg
+setup.bat
+
+fixer_env/
+.venv/
+venv/

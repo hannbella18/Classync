@@ -1,0 +1,429 @@
+/* =========================================================
+   1. PAGE LAYOUT & HEADER
+   ========================================================= */
+
+.admin-main {
+  padding: 24px 32px 32px;
+}
+
+.users-header {
+  display: flex;
+  align-items: flex-end;
+  justify-content: space-between;
+  gap: 16px;
+  margin-bottom: 16px;
+}
+
+.page-title {
+  margin: 0;
+  font-size: 1.6rem;
+  font-weight: 700;
+}
+
+.page-subtitle {
+  margin: 4px 0 0;
+  font-size: 0.9rem;
+  color: #64748b;
+}
+
+/* =========================================================
+   2. ADD / EDIT USER – SLIDE-DOWN FORM
+   ========================================================= */
+
+.add-user-wrapper {
+  max-height: 0;
+  overflow: hidden;
+  transition: max-height 0.35s ease;
+  margin-bottom: 16px;
+}
+
+.add-user-wrapper.open {
+  max-height: 500px;
+}
+
+.add-user-card {
+  background: #ffffff;
+  border-radius: 20px;
+  padding: 18px 20px 20px;
+  border: 1px solid #e2e8f0;
+  box-shadow: 0 6px 18px rgba(15, 23, 42, 0.08);
+}
+
+.add-user-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 12px;
+}
+
+.add-user-header h2 {
+  margin: 0;
+  font-size: 1.1rem;
+}
+
+.close-btn {
+  border: none;
+  background: transparent;
+  cursor: pointer;
+  font-size: 1.1rem;
+  color: #64748b;
+}
+
+/* ---------- Form layout ---------- */
+
+.form-grid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 14px 18px;
+  margin-top: 6px;
+}
+
+.form-group {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.form-group label {
+  font-size: 0.8rem;
+  font-weight: 500;
+}
+
+.form-group input,
+.form-group select {
+  padding: 7px 10px;
+  border-radius: 10px;
+  border: 1px solid #cbd5e1;
+  background: #ffffff;
+  font-size: 0.85rem;
+  font-family: inherit;
+  cursor: pointer;
+  outline: none;
+  transition: 0.2s ease;
+}
+
+.form-group input:focus,
+.form-group select:focus {
+  border-color: #2563eb;
+  box-shadow: 0 0 0 1px rgba(37, 99, 235, 0.25);
+}
+
+.form-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 10px;
+  margin-top: 16px;
+}
+
+/* department disabled style (for admin role) */
+.form-group.disabled label {
+  opacity: 0.6;
+}
+
+.form-group.disabled select {
+  background-color: #f5f5f5;
+  cursor: not-allowed;
+}
+
+/* =========================================================
+   3. USERS CARD + HEADER (TITLE & FILTERS)
+   ========================================================= */
+
+.users-table-section .card {
+  background: #ffffff;
+  border-radius: 20px;
+  padding: 18px 20px 22px;
+  border: 1px solid #e2e8f0;
+  box-shadow: 0 6px 18px rgba(15, 23, 42, 0.04);
+}
+
+.card-header-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 12px;
+  flex-wrap: wrap;
+}
+
+.card-header-left {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.card-header-right {
+  display: flex;
+  justify-content: flex-end;
+  flex: 1;
+}
+
+.card-title {
+  margin: 0;
+  font-size: 1.1rem;
+  font-weight: 600;
+}
+
+.card-count {
+  font-size: 0.8rem;
+  background: #e5edff;
+  color: #1d4ed8;
+  padding: 4px 10px;
+  border-radius: 999px;
+  font-weight: 500;
+}
+
+/* ---------- Filter pills (search + role) ---------- */
+
+.table-filters {
+  display: flex;
+  gap: 16px;
+  flex-wrap: wrap;
+}
+
+/* label on top: small, grey, uppercase */
+.filter-group {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.filter-label {
+  font-size: 0.7rem;
+  font-weight: 600;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: #9ca3af;
+}
+
+/* pill wrapper */
+.filter-control {
+  position: relative;
+  display: flex;
+  align-items: center;
+  padding: 0 14px;
+  min-height: 40px;
+  border-radius: 999px;
+  border: 1px solid #e0e7ff;
+  background-color: #f9fafb;
+}
+
+/* input inside pill */
+.filter-control input {
+  border: none;
+  background: transparent;
+  outline: none;
+  font-size: 0.9rem;
+  width: 200px;
+  color: #111827;
+}
+
+.filter-control input::placeholder {
+  color: #9ca3af;
+}
+
+/* select inside pill */
+.filter-control select {
+  border: none;
+  background: transparent;
+  outline: none;
+  font-size: 0.9rem;
+  color: #111827;
+  padding-right: 20px; /* space for native arrow */
+}
+
+/* search icon on the right */
+.filter-search-icon {
+  position: absolute;
+  right: 14px;
+  font-size: 0.9rem;
+  color: #9ca3af;
+}
+
+/* small tweak so text doesn't overlap icon */
+.filter-search input {
+  padding-right: 24px;
+}
+
+/* focus state */
+.filter-control:focus-within {
+  border-color: #4f46e5;
+  box-shadow: 0 0 0 1px rgba(79, 70, 229, 0.12);
+  background-color: #ffffff;
+}
+
+/* =========================================================
+   4. TABLE & CELLS
+   ========================================================= */
+
+.table-wrapper {
+  overflow-x: auto;
+}
+
+.users-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 0.85rem;
+}
+
+.users-table thead th {
+  text-align: left;
+  padding: 8px 6px;
+  border-bottom: 1px solid #e2e8f0;
+  color: #64748b;
+  font-weight: 500;
+}
+
+.users-table tbody td {
+  padding: 8px 6px;
+  border-bottom: 1px solid #e2e8f0;
+}
+
+.empty-row {
+  text-align: center;
+  padding: 14px 0;
+  color: #94a3b8;
+}
+
+/* password cell */
+.pw-cell {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+/* =========================================================
+   USERS OVERVIEW ROW (like Class Overview)
+   ========================================================= */
+
+.users-overview {
+  margin-top: 8px;
+  margin-bottom: 8px;
+}
+
+.overview-header-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 24px;
+  flex-wrap: wrap;
+}
+
+.overview-title {
+  margin: 0;
+  font-size: 1rem;
+  font-weight: 600;
+  color: #64748b;
+}
+
+.overview-divider {
+  height: 1px;
+  background-color: #e5e7eb;
+  margin-top: 10px;
+  margin-bottom: 18px;
+}
+
+/* =========================================================
+   5. BUTTONS & ICONS
+   ========================================================= */
+
+/* text-style table buttons (not used for icons but kept) */
+.table-btn {
+  border: none;
+  border-radius: 999px;
+  font-size: 0.78rem;
+  padding: 5px 10px;
+  cursor: pointer;
+  margin-right: 4px;
+}
+
+.table-btn-edit {
+  background: #e0f2fe;
+  color: #0369a1;
+}
+
+.table-btn-delete {
+  background: #fee2e2;
+  color: #b91c1c;
+}
+
+/* icon-only buttons (pen / bin / eye) */
+.icon-btn,
+.pw-toggle-btn {
+  background: none;
+  border: none;
+  padding: 4px;
+  cursor: pointer;
+  border-radius: 8px;
+  display: flex;
+  align-items: center;
+  transition: 0.15s ease;
+}
+
+.icon-btn:hover {
+  background-color: rgba(0, 0, 0, 0.05);
+}
+
+.icon-btn.edit-btn:hover {
+  background-color: rgba(21, 101, 192, 0.12); /* blue tint */
+}
+
+.icon-btn.delete-btn:hover {
+  background-color: rgba(239, 68, 68, 0.12); /* red tint */
+}
+
+.row-icon {
+  width: 18px;
+  height: 18px;
+}
+
+/* =========================================================
+   6. PASSWORD FIELDS (FORM + TABLE)
+   ========================================================= */
+
+.pw-icon {
+  width: 22px;
+  height: 22px;
+}
+
+/* password field in form */
+.password-input-wrapper {
+  position: relative;
+  display: flex;
+  align-items: center;
+}
+
+.password-input-wrapper input {
+  width: 100%;
+  padding-right: 38px; /* space for icon */
+}
+
+.password-input-wrapper .pw-toggle-btn {
+  position: absolute;
+  right: 10px;
+  padding: 0;
+}
+
+/* =========================================================
+   Secondary action button (Cancel)
+   ========================================================= */
+
+.btn-secondary {
+  padding: 8px 18px;
+  border-radius: 999px;
+  border: 1px solid #e5e7eb;
+  background: #f8fafc;        /* light gray */
+  color: #475569;             /* slate text */
+  font-size: 0.85rem;
+  font-weight: 500;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.btn-secondary:hover {
+  background: #f1f5f9;
+  border-color: #cbd5e1;
+}
+
+.btn-secondary:active {
+  transform: translateY(1px);
+}

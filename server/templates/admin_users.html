@@ -1,0 +1,280 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <title>Classync – Manage Users</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+
+  <!-- Poppins font -->
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link
+    href="https://fonts.googleapis.com/css2?family=Poppins:wght@300;400;500;600;700&display=swap"
+    rel="stylesheet"
+  />
+
+  <!-- Reuse main admin styles -->
+  <link
+    rel="stylesheet"
+    href="{{ url_for('static', filename='css/admin_dashboard.css') }}"
+  />
+
+  <!-- Page-specific styles -->
+  <link
+    rel="stylesheet"
+    href="{{ url_for('static', filename='css/admin_users.css') }}"
+  />
+</head>
+<body>
+  <div class="admin-page">
+
+    <!-- Navbar (same structure as dashboard) -->
+    <header class="admin-navbar">
+      <div class="admin-nav-left">
+        <a href="{{ url_for('admin_dashboard') }}" class="admin-logo admin-logo-link">
+          Classync
+        </a>
+      </div>
+
+      <div class="admin-nav-center">
+        <div class="admin-nav-title">Users</div>
+      </div>
+
+      <div class="admin-nav-right">
+        <div class="admin-profile">
+          <div class="admin-avatar">
+            {{ (current_user.name[0:1]|upper ~ (current_user.name.split(' ')[-1][0:1]|upper if current_user.name.split(' ')|length > 1 else "")) if current_user else "AD" }}
+          </div>
+          <div class="admin-profile-text">
+            <div class="admin-profile-name">
+              {{ current_user.name if current_user else "Admin User" }}
+            </div>
+            <div class="admin-profile-role">Administrator</div>
+          </div>
+        </div>
+
+        <a href="{{ url_for('logout') }}" class="admin-logout-btn">
+          <span class="logout-icon">⏻</span> Logout
+        </a>
+      </div>
+    </header>
+
+    <!-- MAIN -->
+    <main class="admin-main">
+
+      <!-- Header + Add button -->
+      <section class="users-header">
+        <div>
+          <h1 class="page-title">Manage Users</h1>
+          <p class="page-subtitle">
+            Add new admin & lecturer accounts, or review existing users in Classync.
+          </p>
+        </div>
+        <button id="toggleAddUser" class="primary-btn">
+          + Add new user
+        </button>
+      </section>
+
+      <!-- Slide-down Add User form -->
+      <section class="add-user-wrapper" id="addUserWrapper">
+        <div class="add-user-card">
+          <div class="add-user-header">
+            <h2>Add new user</h2>
+            <button id="closeAddUser" class="close-btn" aria-label="Close">✕</button>
+          </div>
+
+          <form id="addUserForm"
+                method="POST"
+                action="{{ url_for('admin_create_user') }}">
+            <input type="hidden" id="is_edit" name="is_edit" value="no" />
+            <input type="hidden" id="edit_user_id" name="edit_user_id" value="" />
+
+            <div class="form-grid">
+              <div class="form-group">
+                <label for="user_name">Full name</label>
+                <input type="text" id="user_name" name="name" required />
+              </div>
+
+              <div class="form-group">
+                <label for="user_email">Email</label>
+                <input type="email" id="user_email" name="email" required />
+              </div>
+
+              <div class="form-group">
+                <label for="user_role">Role</label>
+                <select id="user_role" name="role" required>
+                  <option value="lecturer">Lecturer</option>
+                  <option value="admin">Admin</option>
+                </select>
+              </div>
+
+              <div class="form-group">
+                <label for="user_password">Temporary password</label>
+                <div class="password-input-wrapper">
+                  <input type="password" id="user_password" name="password" required />
+
+                  <button type="button" class="pw-toggle-btn pw-toggle-form">
+                    <img src="{{ url_for('static', filename='img/closed-password.png') }}"
+                         class="pw-icon pw-icon-closed" />
+                    <img src="{{ url_for('static', filename='img/open-password.png') }}"
+                         class="pw-icon pw-icon-open" style="display:none;" />
+                  </button>
+                </div>
+              </div>
+
+              <div class="form-group" id="departmentGroup">
+                <label for="user_department">Department</label>
+                <select id="user_department" name="department_id">
+                  <option value="">-- Select department --</option>
+                  {% for d in departments %}
+                    <option value="{{ d.dept_id }}">
+                      {{ d.name }} ({{ d.faculty_name }})
+                    </option>
+                  {% endfor %}
+                </select>
+              </div>
+            </div>
+
+            <div class="form-actions">
+              <button type="button" class="btn-secondary" id="cancelAddUser">
+                Cancel
+              </button>
+              <button type="submit" class="primary-btn">
+                Save user
+              </button>
+            </div>
+          </form>
+        </div>
+      </section>
+
+      <!-- Users overview + filters (like Class Overview row) -->
+      <section class="users-overview">
+        <div class="overview-header-row">
+          <h2 class="overview-title">Users Overview</h2>
+
+          <div class="table-filters">
+            <!-- SEARCH -->
+            <div class="filter-group">
+              <div class="filter-label">SEARCH</div>
+              <div class="filter-control filter-search">
+                <input
+                  type="text"
+                  id="userSearch"
+                  placeholder="Search by name or email"
+                />
+                <span class="filter-search-icon">🔍</span>
+              </div>
+            </div>
+
+            <!-- ROLE -->
+            <div class="filter-group">
+              <div class="filter-label">ROLE</div>
+              <div class="filter-control">
+                <select id="userRoleFilter">
+                  <option value="all">All roles</option>
+                  <option value="lecturer">Lecturer</option>
+                  <option value="admin">Admin</option>
+                </select>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <div class="overview-divider"></div>
+      </section>
+
+      <!-- Users table -->
+      <section class="users-table-section">
+        <div class="card">
+          <div class="card-header-row">
+            <h2 class="card-title">Existing users</h2>
+
+            <div class="card-header-right">
+              <span class="card-count">{{ users|length }} total</span>
+            </div>
+          </div>
+
+          <div class="table-wrapper">
+            <table class="users-table">
+              <thead>
+                <tr>
+                  <th>ID</th>
+                  <th>Name</th>
+                  <th>Email</th>
+                  <th>Password</th>
+                  <th>Created at</th>
+                  <th>Department</th>
+                  <th>Faculty</th>
+                  <th>Role</th>
+                  <th>Status</th>
+                  <th>Actions</th>
+                </tr>
+              </thead>
+
+              <tbody>
+                {% if users and users|length > 0 %}
+                  {% for u in users %}
+                  <tr
+                    data-name="{{ u.name|lower }}"
+                    data-email="{{ u.email|lower }}"
+                    data-role="{{ u.role|lower }}"
+                  >
+                    <td>{{ u.id }}</td>
+                    <td>{{ u.name }}</td>
+                    <td>{{ u.email }}</td>
+
+                    <!-- Password (hashed) with show/hide -->
+                    <td class="pw-cell">
+                      <span class="pw-masked">••••••••••</span>
+                      <span class="pw-plain" data-pw="{{ u.pw_hash }}" style="display: none;"></span>
+                      <button type="button" class="pw-toggle-btn pw-toggle-table">
+                        <img src="{{ url_for('static', filename='img/open-password.png') }}"
+                             class="pw-icon pw-icon-closed" />
+                        <img src="{{ url_for('static', filename='img/closed-password.png') }}"
+                             class="pw-icon pw-icon-open" style="display:none;" />
+                      </button>
+                    </td>
+
+                    <td>{{ u.created_at }}</td>
+                    <td>{{ u.department_name }}</td>
+                    <td>{{ u.faculty_name }}</td>
+                    <td>{{ u.role }}</td>
+                    <td>{{ u.status }}</td>
+                    <td>
+                      <button type="button"
+                              class="table-btn table-btn-edit"
+                              data-id="{{ u.id }}"
+                              data-name="{{ u.name }}"
+                              data-email="{{ u.email }}"
+                              data-role="{{ u.role|lower }}"
+                              data-dept-id="{{ u.dept_id or '' }}">
+                        <img src="{{ url_for('static', filename='img/pen.png') }}" class="row-icon" />
+                      </button>
+                      <button type="button"
+                              class="table-btn table-btn-delete"
+                              data-id="{{ u.id }}"
+                              data-name="{{ u.name }}">
+                        <img src="{{ url_for('static', filename='img/bin.png') }}" class="row-icon" />
+                      </button>
+                    </td>
+                  </tr>
+                  {% endfor %}
+                {% else %}
+                  <tr>
+                    <td colspan="10" class="empty-row">
+                      No users found. Click “Add new user” to create one.
+                    </td>
+                  </tr>
+                {% endif %}
+              </tbody>
+            </table>
+          </div>
+        </div>
+      </section>
+
+    </main>
+  </div>
+
+  <script src="{{ url_for('static', filename='js/admin_users.js') }}"></script>
+</body>
+</html>

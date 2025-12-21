@@ -1,0 +1,13 @@
+# Core backend
+flask
+flask-cors
+flask-socketio
+eventlet
+
+# Vision + ML
+opencv-python
+numpy
+onnxruntime
+
+# YOLOv8 (Ultralytics)
+ultralytics==8.3.0

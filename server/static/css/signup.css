@@ -1,0 +1,272 @@
+/* ------------------------------
+   GLOBAL
+------------------------------ */
+body {
+    margin: 0;
+    padding: 0;
+    font-family: "Poppins", sans-serif;
+    background: #ffffff;
+    overflow-x: hidden;
+}
+
+.signup-wrapper {
+    height: 100vh;
+}
+
+/* ------------------------------
+   LEFT PANEL
+------------------------------ */
+.left-panel {
+    position: relative;
+    overflow: hidden;
+    background: linear-gradient(135deg, #e9f1ff, #ffffff);
+}
+
+.shape {
+    position: absolute;
+    border-radius: 50%;
+    filter: blur(45px);
+    animation: floatShape 8s ease-in-out infinite;
+}
+
+.shape-1 {
+    width: 380px;
+    height: 380px;
+    background: rgba(21, 101, 192, 0.25);
+    top: -50px;
+    left: -40px;
+}
+
+.shape-2 {
+    width: 300px;
+    height: 300px;
+    background: rgba(100, 156, 255, 0.23);
+    top: 250px;
+    left: 100px;
+}
+
+.shape-3 {
+    width: 480px;
+    height: 480px;
+    background: rgba(140, 180, 255, 0.18);
+    bottom: -100px;
+    right: -60px;
+}
+
+@keyframes floatShape {
+    0%,100% { transform: translateY(0px); }
+    50%     { transform: translateY(-25px); }
+}
+
+.illustration-box {
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -50%);
+    background: #ffffffc9;
+    padding: 40px 50px;
+    border-radius: 25px;
+    box-shadow: 0px 18px 35px rgba(0,0,0,0.08);
+    backdrop-filter: blur(15px);
+    animation: floatIllust 4.5s ease-in-out infinite;
+}
+
+.illustration {
+    width: 380px;
+}
+
+@keyframes floatIllust {
+    0%,100% { transform: translate(-50%, -50%) translateY(0); }
+    50%     { transform: translate(-50%, -50%) translateY(-18px); }
+}
+
+/* ------------------------------
+   RIGHT PANEL
+------------------------------ */
+.form-wrapper {
+    width: 80%;
+    max-width: 430px;
+    margin-top: -20px;
+}
+
+.brand-title {
+    font-size: 36px;
+    font-weight: 700;
+    color: #1565C0;
+    margin-bottom: 6px;
+}
+
+.signup-subtitle {
+    margin-top: 0;
+    margin-bottom: 22px;
+    color: #555;
+    font-size: 16px;
+}
+
+/* ------------------------------
+   LABELS
+------------------------------ */
+.form-wrapper label {
+    font-size: 14px;
+    margin-bottom: 4px;
+    font-weight: 500;
+}
+
+/* ------------------------------
+   ALL INPUTS (same style)
+------------------------------ */
+.input-classync,
+.input-box {
+    margin-bottom: 4px;
+    width: 100%;
+    padding: 14px 16px;
+    box-sizing: border-box;
+    border-radius: 12px;
+    border: 1px solid #dcdcdc;
+    background: #f8f8f8;
+    font-size: 15px;
+    color: #333;
+    transition: 0.2s ease;
+}
+
+.input-classync::placeholder,
+.input-box::placeholder {
+    color: #B4B4B4;
+    font-size: 15px;
+}
+
+.input-classync:focus,
+.input-box:focus {
+    border-color: #1a73e8;
+    background: #ffffff;
+    box-shadow: 0 0 0 3px rgba(26,115,232,0.15);
+    outline: none;
+}
+
+/* ------------------------------
+   PASSWORD WRAPPER + ICON
+------------------------------ */
+.password-wrapper {
+    position: relative;
+}
+
+/* keep same height as other inputs, just add room for icon */
+.password-wrapper .input-box {
+    padding-right: 34px;   /* enough space for 16px icon + padding */
+}
+
+/* 16px eye icon */
+.pw-icon {
+    position: absolute;
+    right: 12px;
+    top: 50%;
+    transform: translateY(-50%);
+    width: 16px;
+    height: 16px;
+    opacity: 0.7;
+    cursor: pointer;
+    transition: opacity 0.2s;
+}
+
+.pw-icon:hover {
+    opacity: 1;
+}
+
+/* hint text under password box */
+.pw-hint {
+    font-size: 12px;
+    margin: 4px 0 16px;  /* small gap under input */
+    color: #8a95ad;
+    line-height: 1.4;
+}
+
+/* ------------------------------
+   BUTTON
+------------------------------ */
+.signup-btn {
+    background: linear-gradient(90deg, #1a66dd, #1a73e8);
+    color: white;
+    padding: 12px;
+    font-size: 17px;
+    border-radius: 10px;
+    border: none;
+    transition: 0.2s;
+}
+
+.signup-btn:hover {
+    background: linear-gradient(90deg, #1559c4, #166ce2);
+}
+
+/* ------------------------------
+   BOTTOM TEXT
+------------------------------ */
+.login-text {
+    margin-top: 18px;
+    font-size: 14px;
+    color: #555;
+}
+
+.login-text a {
+    color: #1565C0;
+    font-weight: 500;
+    text-decoration: none;
+}
+
+.login-text a:hover {
+    text-decoration: underline;
+}
+
+/* ===== Signup Success Popup ===== */
+
+.signup-popup-backdrop {
+    position: fixed;
+    inset: 0;
+    background: rgba(0,0,0,0.45);
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    z-index: 2000;
+}
+
+.signup-popup-card {
+    background: #ffffff;
+    padding: 28px 32px;
+    border-radius: 18px;
+    width: 90%;
+    max-width: 380px;
+    text-align: center;
+    box-shadow: 0 12px 30px rgba(0,0,0,0.25);
+}
+
+.signup-popup-title {
+    font-size: 22px;
+    font-weight: 600;
+    color: #1565C0;
+    margin-bottom: 8px;
+}
+
+.signup-popup-text {
+    font-size: 14px;
+    color: #5b5b5b;
+    margin-bottom: 20px;
+}
+
+.signup-popup-btn {
+    background: linear-gradient(90deg, #1a66dd, #1a73e8);
+    color: white;
+    border: none;
+    border-radius: 999px;
+    padding: 10px 22px;
+    font-size: 15px;
+}
+.signup-popup-btn:hover {
+    background: linear-gradient(90deg, #1559c4, #1662dc);
+}
+
+/* ------------------------------
+   RESPONSIVE
+------------------------------ */
+@media (max-width: 768px) {
+    .left-panel { display: none; }
+    .right-panel { padding: 40px; }
+}

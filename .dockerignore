@@ -1,0 +1,24 @@
+# Ignore the heavy virtual environment (This is likely 5GB+)
+.venv311
+.venv
+venv
+env
+
+# Ignore Python cache files
+__pycache__
+*.pyc
+*.pyo
+*.pyd
+
+# Ignore local database (we use Supabase now!)
+data/app.db
+instance/
+*.sqlite3
+
+# Ignore heavy video uploads (if any)
+server/uploads/
+server/static/uploads/
+
+# Ignore the heavy original PyTorch models (we use ONNX now)
+# (Adjust this line if you keep your onnx file in the same folder)
+*.pt

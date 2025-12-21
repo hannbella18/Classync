@@ -1,0 +1,35 @@
+#meet-monitor-overlay {
+  position: fixed; top: 16px; right: 16px; z-index: 999999;
+  font-family: system-ui, sans-serif; font-size: 12px;
+}
+#meet-monitor-overlay .mm-card {
+  background: rgba(18,18,18,.92); color:#fff; padding: 10px 12px;
+  border-radius: 12px; box-shadow: 0 6px 24px rgba(0,0,0,.35); width: 240px;
+}
+#meet-monitor-overlay .mm-row { display:flex; gap:6px; align-items:center; margin-bottom:6px; }
+#meet-monitor-overlay button { padding: 4px 8px; border-radius: 8px; border: 0; cursor: pointer; }
+#meet-monitor-overlay .mm-status { display:flex; gap: 10px; margin-top: 6px; opacity: .95; }
+#meet-monitor-overlay #mm-log { margin-top:8px; max-height:160px; overflow:auto; display:flex; flex-direction:column; gap:4px; }
+
+#mm-detecting {
+  margin-top: 6px;
+  font-size: 12px;
+  line-height: 1.2;
+  color: rgba(15, 23, 42, 0.75); /* slate-900 @ 75% */
+  user-select: none;
+}
+
+#mm-detecting .mm-dots {
+  display: inline-block;
+  overflow: hidden;
+  width: 0ch;                /* start hidden */
+  vertical-align: baseline;
+  animation: mm-dots 1.2s steps(4, end) infinite;
+  margin-left: 2px;
+}
+
+/* We actually put three dots in the DOM ("...") and just reveal them */
+@keyframes mm-dots {
+  0%   { width: 0ch; }
+  100% { width: 3ch; }
+}

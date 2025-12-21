@@ -1,0 +1,131 @@
+<!doctype html>
+<html>
+<head>
+  <meta charset="utf-8" />
+   <title>Classync • Dashboard</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <link rel="stylesheet" href="{{ url_for('static', filename='css/dashboard.css') }}">
+</head>
+<body>
+  <!-- Top bar -->
+  <header class="topbar">
+    <div class="left">
+      <button class="icon" id="btn-menu">☰</button>
+      <div class="brand"><em>Classync</em></div>
+    </div>
+    <div class="right">
+      <div class="profile">
+        <div class="avatar"></div>
+        <div class="who">
+          <div class="name">Lecturer Name</div>
+          <div class="pos">Position</div>
+        </div>
+      </div>
+      <a href="{{ url_for('logout') }}" id="btn-logout" class="icon">
+        <img src="{{ url_for('static', filename='img/logout.png') }}" alt="Logout" style="width:24px; height:24px;">
+      </a>
+    </div>
+  </header>
+
+  <main class="wrap">
+    <!-- Last classes (max 3) -->
+    <section class="panel last">
+      <div class="head">
+        <h2>Your Last Class <span class="hint">(3 latest class)</span></h2>
+        <div class="tools">
+          <button id="btn-refresh">Refresh</button>
+          <span id="synced">Last synced: –</span>
+        </div>
+      </div>
+      <div class="table">
+        <div class="row header">
+          <div>Date</div><div>Online Platform</div><div>Class</div><div>Participant</div>
+        </div>
+        <div id="recent-body"></div>
+      </div>
+    </section>
+
+    <!-- Enrolled classes -->
+    <section class="panel enrolled">
+      <h2>Enrolled Classes</h2>
+      <div id="class-cards" class="cards"></div>
+    </section>
+  </main>
+
+  <script>
+  const BASE = location.origin;
+
+  function recentRow({ date, platform_link, class_id, participants }) {
+    const r = document.createElement('div');
+    r.className = 'row';
+
+    const cDate = document.createElement('div');
+    cDate.textContent = new Date(date).toLocaleString();
+
+    const cPlat = document.createElement('div');
+    if (platform_link) {
+      const a = document.createElement('a');
+      a.href = platform_link;
+      a.target = '_blank';
+      a.rel = 'noopener';
+      a.className = 'btn-join';
+      a.textContent = 'Join Meet';
+      cPlat.appendChild(a);
+      const host = document.createElement('span');
+      host.className = 'host';
+      host.textContent = ' ' + new URL(platform_link).hostname.replace('www.','');
+      cPlat.appendChild(host);
+    } else {
+      cPlat.textContent = '—';
+    }
+
+    const cClass = document.createElement('div');
+    cClass.textContent = class_id || '—';
+
+    const cPart = document.createElement('div');
+    cPart.textContent = `${participants} / —`;
+
+    [cDate, cPlat, cClass, cPart].forEach(x => r.appendChild(x));
+    return r;
+  }
+
+  async function loadRecent() {
+    const r = await fetch(`${BASE}/api/sessions/recent?limit=3`);
+    const j = await r.json();
+    const body = document.getElementById('recent-body');
+    body.innerHTML = '';
+    if (!j.ok) return;
+    j.sessions.forEach(s => body.appendChild(recentRow(s)));
+    document.getElementById('synced').textContent = 'Last synced: ' + new Date().toLocaleTimeString();
+  }
+
+    async function loadClasses() {
+    const r = await fetch(`${BASE}/api/classes`);
+    const j = await r.json();
+    const box = document.getElementById('class-cards');
+    box.innerHTML = '';
+    if (!j.ok) return;
+
+    // Only show CSC4400 (for now)
+    j.classes
+      .filter(c => c.id === 'CSC4400')
+      .forEach(c => {
+        // whole card clickable → summary.html
+        const card = document.createElement('a');
+        card.className = 'card';
+        card.href = `/summary?class=${encodeURIComponent(c.id)}`;
+        card.innerHTML = `
+          <div class="thumb"></div>
+          <div class="code">${c.id}</div>
+        `;
+        box.appendChild(card);
+      });
+  }
+
+
+  document.getElementById('btn-refresh').addEventListener('click', () => { loadRecent(); loadClasses(); });
+  loadRecent(); loadClasses();
+</script>
+
+</body>
+</html>

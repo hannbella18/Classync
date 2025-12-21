@@ -1,0 +1,352 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <title>Classync – Student Extension Setup</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+
+  <!-- Poppins font -->
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link
+    href="https://fonts.googleapis.com/css2?family=Poppins:wght@300;400;500;600;700&display=swap"
+    rel="stylesheet"
+  />
+
+  <!-- External CSS -->
+  <link rel="stylesheet" href="{{ url_for('static', filename='css/student_extension.css') }}">
+</head>
+
+<body>
+  <div class="page-wrapper">
+    <div class="page-container">
+
+      <!-- HEADER -->
+      <header class="page-header">
+        <div class="brand">
+          <div class="brand-logo">C</div>
+          <div class="brand-text">
+            <div class="brand-name">Classync</div>
+            <div class="brand-tagline">Smart Online Class Engagement</div>
+          </div>
+        </div>
+        <div class="student-pill">Student · Extension Setup</div>
+      </header>
+
+      <!-- HERO -->
+      <section class="hero fade-up">
+        <h1 class="hero-title">Set Up Classync for Your Online Class</h1>
+        <p class="hero-subtitle">
+          Follow these simple steps to install the Classync browser extension.
+          It will help your lecturer record your attendance and engagement automatically
+          when you join online classes.
+        </p>
+      </section>
+
+      <!-- INFO: WHO SHOULD USE THIS PAGE -->
+      <section class="info-box slide-in">
+        <div class="info-title">Who should use this page?</div>
+        <p>
+          This page is only for students whose lecturer asked them to install the
+          <strong>Classync extension</strong> (for example, via <strong>PutraBlast</strong>).
+          If your lecturer did not mention Classync, you can ignore this page.
+        </p>
+      </section>
+
+      <!-- STEP 1 -->
+      <section class="step-section fade-up delay-1">
+        <div class="step-heading">
+          <div class="step-badge">1</div>
+          <div class="step-title-text">Download the Classync extension</div>
+        </div>
+        <p class="section-desc">
+          First, download the extension file to your laptop. You will install it into
+          Google Chrome in the next step.
+        </p>
+
+        <div class="download-card">
+          <div class="download-text">
+            <div class="download-title">Download extension (.zip)</div>
+            <p class="download-desc">
+              Click the button to download the latest Classync extension file
+              <strong>(.zip)</strong>. After downloading, you do not need to open it yet.
+            </p>
+          </div>
+
+          <!-- Update filename if your zip has a different name/path -->
+          <a
+            href="{{ url_for('static', filename='extension/classync_extension.zip') }}"
+            class="download-btn"
+            download
+          >
+            <span class="icon">⬇️</span>
+            <span>Download Extension</span>
+          </a>
+        </div>
+      </section>
+
+      <!-- STEP 2 -->
+      <section class="step-section fade-up delay-2">
+        <div class="step-heading">
+          <div class="step-badge">2</div>
+          <div class="step-title-text">Install the extension in Google Chrome</div>
+        </div>
+        <p class="section-desc">
+          Follow these steps on your laptop using <strong>Google Chrome</strong>
+          (or a similar browser like Microsoft Edge).
+        </p>
+
+        <div class="steps-grid">
+          <!-- Step 1 -->
+          <article class="step-card hover-pop">
+            <div class="step-number">1</div>
+            <div>
+              <div class="step-content-title">Open the Extensions page</div>
+              <p class="step-content-text">
+                In Chrome, click the address bar, type
+                <code>chrome://extensions</code>, then press <strong>Enter</strong>.
+              </p>
+            </div>
+          </article>
+
+          <!-- Step 2 -->
+          <article class="step-card hover-pop">
+            <div class="step-number">2</div>
+            <div>
+              <div class="step-content-title">Turn on Developer mode</div>
+              <p class="step-content-text">
+                On the top-right of the Extensions page, switch on
+                <strong>Developer mode</strong>.
+              </p>
+            </div>
+          </article>
+
+          <!-- Step 3 -->
+          <article class="step-card hover-pop">
+            <div class="step-number">3</div>
+            <div>
+              <div class="step-content-title">Extract the ZIP file</div>
+              <p class="step-content-text">
+                Go to your <strong>Downloads</strong> folder, right-click
+                <strong>classync_extension.zip</strong> and choose
+                <strong>Extract All...</strong>. Remember where the new folder is saved.
+              </p>
+            </div>
+          </article>
+
+          <!-- Step 4 -->
+          <article class="step-card hover-pop">
+            <div class="step-number">4</div>
+            <div>
+              <div class="step-content-title">Load the extension folder</div>
+              <p class="step-content-text">
+                Back on <code>chrome://extensions</code>, click
+                <strong>“Load unpacked”</strong>, then choose the extracted
+                <strong>classync_extension</strong> folder.
+              </p>
+            </div>
+          </article>
+
+          <!-- Step 5 -->
+          <article class="step-card hover-pop">
+            <div class="step-number">5</div>
+            <div>
+              <div class="step-content-title">Pin the extension (optional)</div>
+              <p class="step-content-text">
+                Click the <strong>puzzle icon</strong> (Extensions) near the address bar
+                and click the <strong>pin icon</strong> beside “Classync” so it is easy
+                to see.
+              </p>
+            </div>
+          </article>
+        </div>
+
+        <div class="tip-box">
+          ✅ If the setup worked, you should now see “Classync” in your extensions list.
+          Make sure the toggle is turned on (blue).
+        </div>
+      </section>
+
+      <!-- STEP 3 -->
+      <section class="step-section fade-up delay-3">
+        <div class="step-heading">
+          <div class="step-badge">3</div>
+          <div class="step-title-text">Join your online class</div>
+        </div>
+        <p class="section-desc">
+          After installing the extension:
+        </p>
+
+        <div class="tip-box important">
+          • Go back to <strong>PutraBlast</strong>.<br />
+          • Open your course page and click the <strong>Google Meet link</strong> given by your lecturer.<br />
+          • Join the class as usual.<br /><br />
+          As long as the Classync extension is turned on, it will work in the background
+          to help record your attendance and engagement for that class.
+        </div>
+      </section>
+
+      <!-- INSTALLATION VIDEO TUTORIAL -->
+      <section class="step-section fade-up delay-4 video-section">
+        <h2 class="video-title">Prefer to watch a quick video?</h2>
+        <p class="section-desc">
+          Watch this short tutorial to see the full installation process step-by-step.
+        </p>
+        <div class="video-wrapper">
+          <!-- Option A: Local MP4 file -->
+          <video controls class="video-player">
+            <source src="{{ url_for('static', filename='img/install-classync.mp4') }}" type="video/mp4" />
+            Your browser does not support the video tag.
+          </video>
+
+          <!-- 
+          Option B: YouTube embed (if you upload to YouTube)
+          Replace the <video> above with this iframe:
+
+          <iframe
+            class="video-player"
+            src="https://www.youtube.com/embed/VIDEO_ID"
+            title="Classync Installation Tutorial"
+            frameborder="0"
+            allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
+            allowfullscreen>
+          </iframe>
+          -->
+        </div>
+      </section>
+
+      <!-- FAQ SECTION -->
+      <section class="step-section fade-up delay-5 faq-section">
+        <h2 class="faq-title">Frequently Asked Questions (FAQ)</h2>
+        <p class="section-desc">
+          Quick answers to common issues students might face.
+        </p>
+
+        <div class="faq-list">
+          <details class="faq-item">
+            <summary class="faq-question">
+              I don't see the Classync extension after installing. What should I do?
+            </summary>
+            <div class="faq-answer">
+              Open <code>chrome://extensions</code> and check if “Classync” is listed and turned on.
+              Also click the puzzle icon near the address bar and pin the extension so it is visible.
+            </div>
+          </details>
+
+          <details class="faq-item">
+            <summary class="faq-question">
+              Do I need to log in to Classync as a student?
+            </summary>
+            <div class="faq-answer">
+              No. Only your lecturer and admin use the Classync website. As a student, you just
+              need to install the extension and join the online class using the Meet link given.
+            </div>
+          </details>
+
+          <details class="faq-item">
+            <summary class="faq-question">
+              Will Classync record me outside of class time?
+            </summary>
+            <div class="faq-answer">
+              Classync is only used for classes where your lecturer activates it.
+              You can always turn off or remove the extension from your browser at any time.
+            </div>
+          </details>
+
+          <details class="faq-item">
+            <summary class="faq-question">
+              I installed the extension but my lecturer says I'm still “absent”.
+            </summary>
+            <div class="faq-answer">
+              Make sure the extension is turned on, you joined the correct Meet link, and you
+              stayed in the class for the required duration. If still not working, screenshot
+              your extension page and inform your lecturer.
+            </div>
+          </details>
+        </div>
+      </section>
+
+      <!-- CHECK EXTENSION STATUS -->
+      <section class="step-section fade-up delay-6 status-section">
+        <h2 class="status-title">Want to check if the extension is working?</h2>
+        <p class="section-desc">
+          This quick check tries to see if the Classync extension can respond from this page.
+          Even if this check fails, the extension can still work correctly on Google Meet.
+        </p>
+
+        <div class="status-card">
+          <button id="check-status-btn" class="status-button">
+            🔍 Check Extension Status
+          </button>
+          <p id="extension-status-message" class="status-text status-muted">
+            Click the button to run a simple check.
+          </p>
+        </div>
+
+        <p class="status-note">
+          For this button to fully work, the Classync extension needs permission to run on this
+          website and send a small response. Your system admin can configure this later.
+        </p>
+      </section>
+
+      <!-- FOOTER NOTE -->
+      <footer class="footer-note">
+        Having trouble? Please contact your lecturer or system admin and send them a
+        screenshot of what you see.
+      </footer>
+
+    </div>
+  </div>
+
+  <!-- Simple JS for "Check Extension Status" -->
+  <script>
+    const checkBtn = document.getElementById("check-status-btn");
+    const statusMessage = document.getElementById("extension-status-message");
+
+    if (checkBtn && statusMessage) {
+      checkBtn.addEventListener("click", () => {
+        statusMessage.textContent = "Checking for Classync extension...";
+        statusMessage.className = "status-text status-checking";
+
+        // We ask the page to send a ping. The extension (if configured)
+        // can listen for this message and reply.
+        window.postMessage({ type: "CLASSYNC_EXTENSION_PING" }, "*");
+
+        let responded = false;
+
+        function handleResponse(event) {
+          if (!event.data || !event.data.type) return;
+
+          if (event.data.type === "CLASSYNC_EXTENSION_PING_RESPONSE") {
+            responded = true;
+            window.removeEventListener("message", handleResponse);
+
+            if (event.data.ok) {
+              statusMessage.textContent =
+                "✅ Classync extension is installed and responded successfully.";
+              statusMessage.className = "status-text status-ok";
+            } else {
+              statusMessage.textContent =
+                "⚠️ The extension responded, but it may not be fully configured. Please recheck setup or inform your lecturer.";
+              statusMessage.className = "status-text status-warning";
+            }
+          }
+        }
+
+        window.addEventListener("message", handleResponse);
+
+        // Timeout after 2 seconds if no response
+        setTimeout(() => {
+          if (!responded) {
+            window.removeEventListener("message", handleResponse);
+            statusMessage.textContent =
+              "❌ We couldn't detect the Classync extension from this page. " +
+              "If you already installed it, that's okay – it will still work on Google Meet.";
+            statusMessage.className = "status-text status-error";
+          }
+        }, 2000);
+      });
+    }
+  </script>
+</body>
+</html>

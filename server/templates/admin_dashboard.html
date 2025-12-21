@@ -1,0 +1,192 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <title>Classync – Admin Dashboard</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+
+  <!-- Poppins font -->
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link
+    href="https://fonts.googleapis.com/css2?family=Poppins:wght@300;400;500;600;700&display=swap"
+    rel="stylesheet"
+  />
+
+  <!-- Admin dashboard CSS -->
+  <link
+    rel="stylesheet"
+    href="{{ url_for('static', filename='css/admin_dashboard.css') }}"
+  />
+</head>
+<body>
+  <div class="admin-page">
+
+    <!-- Navbar -->
+    <header class="admin-navbar">
+      <!-- LEFT SIDE: Logo only -->
+      <div class="admin-nav-left">
+        <a href="{{ url_for('admin_dashboard') }}" class="admin-logo admin-logo-link">
+          Classync
+        </a>
+      </div>
+
+      <!-- CENTER: Dashboard text -->
+      <div class="admin-nav-center">
+        <div class="admin-nav-title">Dashboard</div>
+      </div>
+
+      <!-- RIGHT SIDE: Profile + Logout -->
+      <div class="admin-nav-right">
+        <!-- Profile -->
+        <div class="admin-profile">
+          <div class="admin-avatar">
+            {{ (current_user.name[0:1]|upper ~ (current_user.name.split(' ')[-1][0:1]|upper if current_user.name.split(' ')|length > 1 else "")) if current_user else "AD" }}
+          </div>
+          <div class="admin-profile-text">
+            <div class="admin-profile-name">
+              {{ current_user.name if current_user else "Admin User" }}
+            </div>
+            <div class="admin-profile-role">Administrator</div>
+          </div>
+        </div>
+
+        <!-- Logout -->
+        <a href="{{ url_for('logout') }}" class="admin-logout-btn">
+          <span class="logout-icon">⏻</span> Logout
+        </a>
+      </div>
+    </header>
+
+    <!-- Main Content -->
+    <main class="admin-main">
+
+      <!-- Hero Section -->
+      <section class="admin-hero">
+        <div class="admin-hero-card">
+          <div class="admin-hero-left">
+            <p class="hero-eyebrow">Welcome back,</p>
+            <h1 class="hero-title">
+              {{ current_user.name if current_user else "Admin" }}
+            </h1>
+            <p class="hero-subtitle">
+              Here’s your control center to manage classes, users, departments, and faculties in Classync.
+            </p>
+          </div>
+
+          <div class="admin-hero-right">
+            <img
+              src="{{ url_for('static', filename='img/6.png') }}"
+              alt="Admin illustration"
+              class="hero-illustration-img"
+            />
+          </div>
+        </div>
+      </section>
+
+      <!-- Action Cards -->
+      <section class="admin-actions">
+        <h2 class="section-title">Quick actions</h2>
+        <p class="section-subtitle">
+          Start by creating a new class, managing users, or organising departments and faculties.
+        </p>
+
+        <div class="admin-actions-grid">
+
+          <!-- Create Class -->
+          <article class="admin-action-card" id="card-create-class">
+            <div class="card-header">
+              <h3 class="card-title">Create Class</h3>
+              <span class="card-tag">Classes</span>
+            </div>
+            <p class="card-description">
+              Set up new classes for lecturers to use in Classync. You can define
+              course codes, groups, and schedules.
+            </p>
+            <div class="card-footer">
+              <button
+                type="button"
+                class="primary-btn"
+                id="btn-create-class"
+                data-target="{{ url_for('admin_classes') }}"
+              >
+                Go to create class
+              </button>
+            </div>
+          </article>
+
+          <!-- Manage Users -->
+          <article class="admin-action-card" id="card-manage-users">
+            <div class="card-header">
+              <h3 class="card-title">Manage Users</h3>
+              <span class="card-tag">Admins &amp; Lecturers</span>
+            </div>
+            <p class="card-description">
+              Add new admin accounts, register lecturers, or review existing
+              users in the system.
+            </p>
+            <div class="card-footer">
+              <button
+                type="button"
+                class="primary-btn"
+                id="btn-create-user"
+                data-target="{{ url_for('admin_manage_users') }}"
+              >
+                Go to create user
+              </button>
+            </div>
+          </article>
+
+          <!-- Manage Departments -->
+          <article class="admin-action-card" id="card-manage-departments">
+            <div class="card-header">
+              <h3 class="card-title">Manage Departments</h3>
+              <span class="card-tag">Departments</span>
+            </div>
+            <p class="card-description">
+              Set up and maintain academic departments so classes and lecturers
+              are linked to the correct unit.
+            </p>
+            <div class="card-footer">
+              <button
+                type="button"
+                class="primary-btn"
+                id="btn-manage-departments"
+                data-target="{{ url_for('admin_departments') }}"
+              >
+                Go to departments
+              </button>
+            </div>
+          </article>
+
+          <!-- Manage Faculties -->
+          <article class="admin-action-card" id="card-manage-faculties">
+            <div class="card-header">
+              <h3 class="card-title">Manage Faculties</h3>
+              <span class="card-tag">Faculties</span>
+            </div>
+            <p class="card-description">
+              Create and organise faculties, and connect departments under each
+              faculty for cleaner reporting.
+            </p>
+            <div class="card-footer">
+              <button
+                type="button"
+                class="primary-btn"
+                id="btn-manage-faculties"
+                data-target="{{ url_for('admin_faculties') }}"
+              >
+                Go to faculties
+              </button>
+            </div>
+          </article>
+
+        </div>
+      </section>
+
+    </main>
+  </div>
+
+  <script src="{{ url_for('static', filename='js/admin_dashboard.js') }}"></script>
+</body>
+</html>
