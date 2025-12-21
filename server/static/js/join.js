@@ -13,7 +13,6 @@ document.addEventListener("DOMContentLoaded", () => {
   const token = form.dataset.token || "";
 
   let recognizedStudentId = null;
-  let recognizedName = null;
   let detectInterval = null;
   let stream = null;
 
@@ -36,38 +35,32 @@ document.addEventListener("DOMContentLoaded", () => {
   function setStatus(msg) {
     if (statusText) statusText.textContent = msg;
   }
-  
-  async function fetchProfileAndLockForm() {
-    if (!recognizedStudentId) return;
 
+  /**
+   * Fetches the detailed profile (email) for a recognized ID and locks the form.
+   */
+  async function fetchProfileAndLockForm(studentId) {
     try {
-      const url =
-        `/api/student_profile?student_id=${encodeURIComponent(recognizedStudentId)}` +
-        `&class_id=${encodeURIComponent(classId)}`;
-
+      const url = `/api/student_profile?student_id=${encodeURIComponent(studentId)}&class_id=${encodeURIComponent(classId)}`;
       const res = await fetch(url);
       if (!res.ok) return;
 
       const data = await res.json().catch(() => null);
       if (!data || !data.ok) return;
 
-      if (data.display_name) {
-        nameInput.value = data.display_name;
-      }
-      if (data.email) {
-        emailInput.value = data.email;
-      }
+      // Fill values if they exist in the DB
+      if (data.display_name) nameInput.value = data.display_name;
+      if (data.email) emailInput.value = data.email;
 
-      // Lock both fields so they cannot edit
-      nameInput.readOnly = true;
-      emailInput.readOnly = true;
-
-      // Optional: add a CSS class for visual style
-      nameInput.classList.add("join-input-locked");
-      emailInput.classList.add("join-input-locked");
+      // Lock fields only if the student actually exists in the DB
+      if (data.exists) {
+        nameInput.readOnly = true;
+        emailInput.readOnly = true;
+        nameInput.classList.add("join-input-locked");
+        emailInput.classList.add("join-input-locked");
+      }
     } catch (err) {
       console.error("[join] fetchProfile error:", err);
-      // If this fails, user can still type manually.
     }
   }
 
@@ -76,7 +69,6 @@ document.addEventListener("DOMContentLoaded", () => {
       setStatus("Camera not supported in this browser. You can still join using the form.");
       return;
     }
-
     try {
       stream = await navigator.mediaDevices.getUserMedia({ video: true, audio: false });
       video.srcObject = stream;
@@ -108,9 +100,7 @@ document.addEventListener("DOMContentLoaded", () => {
     const ctx = canvas.getContext("2d");
 
     detectInterval = setInterval(async () => {
-      if (!video || video.readyState < 2) {
-        return;
-      }
+      if (!video || video.readyState < 2) return;
 
       const w = video.videoWidth;
       const h = video.videoHeight;
@@ -120,9 +110,7 @@ document.addEventListener("DOMContentLoaded", () => {
       canvas.height = h;
       ctx.drawImage(video, 0, 0, w, h);
 
-      const blob = await new Promise((resolve) =>
-        canvas.toBlob((b) => resolve(b), "image/jpeg", 0.8)
-      );
+      const blob = await new Promise((resolve) => canvas.toBlob((b) => resolve(b), "image/jpeg", 0.8));
       if (!blob) return;
 
       const formData = new FormData();
@@ -130,64 +118,50 @@ document.addEventListener("DOMContentLoaded", () => {
       formData.append("camera_id", "JOIN_PAGE_" + classId);
 
       try {
-        const res = await fetch("/api/identify", {
-          method: "POST",
-          body: formData,
-        });
+        const res = await fetch("/api/identify", { method: "POST", body: formData });
         const data = await res.json().catch(() => null);
-        if (!data || !data.ok) return;
+        if (!data || !data.ok || recognizedStudentId) return;
 
-        if (recognizedStudentId) return; // already done
-
-        // 1) Known face recognised
+        // --- Logic for Face Identification ---
         if (!data.pending && data.student_id) {
-          recognizedStudentId = data.student_id;
-          recognizedName = data.name || null;
-
-          setStatus("We recognised you. You can click 'Join class' to continue.");
-
-          if (recognizedName) {
-            nameInput.value = recognizedName;
-            nameInput.readOnly = true;
+          if (data.student_id === "NEW_FACE") {
+            // 1) New face detected: Let them type
+            recognizedStudentId = null; 
+            setStatus("New face detected! Please enter your details below to enroll.");
+            nameInput.readOnly = false;
+            emailInput.readOnly = false;
+            nameInput.classList.remove("join-input-locked");
+            emailInput.classList.remove("join-input-locked");
+          } else {
+            // 2) Known face recognized: Lock the form
+            recognizedStudentId = data.student_id;
+            setStatus("Welcome back! We recognised you.");
+            
+            if (data.name) nameInput.value = data.name;
+            await fetchProfileAndLockForm(data.student_id);
           }
-
-          // Fetch email and lock email field if we have it
-          fetchProfileAndLockForm();
-
           stopDetectLoop();
           return;
         }
 
-        // 2) No face at all (bbox == null, pending == false)
+        // --- Logic for Detection Feedback ---
         if (!data.student_id && !data.pending && !data.bbox) {
           setStatus("No face detected. Please look at the camera.");
-          return;
-        }
-
-        // 3) Face detected but still too small / blurry / confirming
-        if (data.pending && data.bbox) {
+        } else if (data.pending && data.bbox) {
           setStatus("Face detected, calibrating… Please hold still for a moment.");
-          return;
+        } else {
+          setStatus("We couldn't clearly recognise you yet. You can still join using the form.");
         }
-
-        // 4) Fallback
-        setStatus(
-          "We couldn't clearly recognise you yet. You can still join using the form."
-        );
-
       } catch (err) {
         console.error("[join] identify error:", err);
       }
     }, 1500);
   }
 
-  // Start camera on load
   startCamera();
 
-  // Handle form submit
   form.addEventListener("submit", async (e) => {
     e.preventDefault();
-
     const name = (nameInput.value || "").trim();
     const email = (emailInput.value || "").trim().toLowerCase();
 
@@ -199,9 +173,7 @@ document.addEventListener("DOMContentLoaded", () => {
     try {
       const res = await fetch(`/api/join/${encodeURIComponent(classId)}`, {
         method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-        },
+        headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           name,
           email,
@@ -211,19 +183,15 @@ document.addEventListener("DOMContentLoaded", () => {
       });
 
       const data = await res.json().catch(() => ({}));
-
       if (!res.ok || !data.ok) {
         showError(data.error || "Unable to join class. Please try again.");
         return;
       }
 
       showSuccess("You have joined this class. Redirecting to the meeting…");
-
       const redirectUrl = data.redirect_url;
       if (redirectUrl) {
-        setTimeout(() => {
-          window.location.href = redirectUrl;
-        }, 800);
+        setTimeout(() => { window.location.href = redirectUrl; }, 800);
       }
     } catch (err) {
       console.error("[join] submit error:", err);
@@ -233,38 +201,4 @@ document.addEventListener("DOMContentLoaded", () => {
       stopCamera();
     }
   });
-
-    async function fetchProfileAndLockForm() {
-    if (!recognizedStudentId) return;
-
-    try {
-      const url =
-        `/api/student_profile?student_id=${encodeURIComponent(recognizedStudentId)}` +
-        `&class_id=${encodeURIComponent(classId)}`;
-
-      const res = await fetch(url);
-      if (!res.ok) return;
-
-      const data = await res.json().catch(() => null);
-      if (!data || !data.ok) return;
-
-      if (data.display_name) {
-        nameInput.value = data.display_name;
-      }
-      if (data.email) {
-        emailInput.value = data.email;
-      }
-
-      // Lock both fields so they cannot edit
-      nameInput.readOnly = true;
-      emailInput.readOnly = true;
-
-      // Optional: add a CSS class for visual style
-      nameInput.classList.add("join-input-locked");
-      emailInput.classList.add("join-input-locked");
-    } catch (err) {
-      console.error("[join] fetchProfile error:", err);
-      // If this fails, user can still type manually.
-    }
-  }
 });

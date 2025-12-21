@@ -3325,7 +3325,7 @@ def api_student_profile():
     conn = connect()
     cur = conn.cursor()
 
-    # 1. Try finding an existing enrollment (Postgres uses 'id', not 'rowid')
+    # 1. Try finding an existing enrollment for this specific class
     row = cur.execute(
         """
         SELECT display_name, email
@@ -3339,14 +3339,16 @@ def api_student_profile():
 
     if row:
         conn.close()
+        # Student is already enrolled in this class
         return jsonify({
             "ok": True,
+            "exists": True,  # Signals frontend to LOCK fields
             "student_id": student_id,
             "display_name": row["display_name"],
             "email": row["email"]
         })
 
-    # 2. Fallback: If not enrolled yet, get name from the master students table
+    # 2. Fallback: Check if the student exists in the master table from another class
     row_stu = cur.execute(
         "SELECT name FROM students WHERE id = %s",
         (student_id,)
@@ -3354,15 +3356,24 @@ def api_student_profile():
     
     conn.close()
 
-    if row_stu:
+    # If they have a name in the master table, we treat them as "Existing"
+    if row_stu and row_stu["name"]:
         return jsonify({
             "ok": True,
+            "exists": True,  # Signals frontend to LOCK fields
             "student_id": student_id,
-            "display_name": row_stu["name"] or "",
+            "display_name": row_stu["name"],
             "email": "" 
         })
 
-    return jsonify({"ok": False, "error": "not_found"}), 404
+    # 3. New face / No name found: Let them edit
+    return jsonify({
+        "ok": True, 
+        "exists": False, # Signals frontend to UNLOCK fields
+        "student_id": student_id,
+        "display_name": "",
+        "email": ""
+    })
 
 # -------------------- API: Summary & Attendance--------------------
 @app.get("/api/summary/<class_id>/hero")
@@ -4724,35 +4735,26 @@ def api_identify():
             }
         )
 
-    # ---------- 7) Handle NEW face with pending window ----------
+    # ---------- 7) Handle NEW face (FIXED LOGIC) ----------
     t = time.time()
     camera_id = (request.form.get("camera_id") or "MEET_TAB").strip()
     st = PENDING_STATE.setdefault(camera_id, {"n": 0, "t0": t})
+    
     if t - st["t0"] > NEW_CONFIRM_WINDOW_S:
         st["n"] = 0
         st["t0"] = t
     st["n"] += 1
 
     if st["n"] >= NEW_CONFIRM_FRAMES:
-        # Confirm as a new student
-        new_id = mint_next_student_id()
-        try:
-            cur.execute(
-                "INSERT INTO students(id, name, embedding, last_seen_ts) "
-                "VALUES (?,?,?,?)",
-                (new_id, None, json.dumps(q.tolist()), now_iso()),
-            )
-            conn.commit()
-        finally:
-            conn.close()
-
+        # Verified new face, but DO NOT save to DB yet.
+        # We signal JS to let the student type manually.
         PENDING_STATE.pop(camera_id, None)
-
+        conn.close()
         return jsonify(
             {
                 "ok": True,
                 "pending": False,
-                "student_id": new_id,
+                "student_id": "NEW_FACE",
                 "name": None,
                 "sim": sim_val,
                 "bbox": bbox_json,
