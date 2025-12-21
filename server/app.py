@@ -3651,7 +3651,7 @@ def api_summary_session_engagement(class_id, session_id):
                ON att.session_id = ?
               AND att.student_id = e.student_id
         WHERE e.class_id = ?
-        ORDER BY student_name COLLATE NOCASE
+        ORDER BY e.display_name COLLATE NOCASE
         """,
         (session_id, session_id, class_id),
     ).fetchall()
