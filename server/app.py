@@ -4696,18 +4696,36 @@ def api_identify():
     rows = cur.execute("SELECT id, name, embedding FROM students").fetchall()
 
     best_sid, best_name, best_sim = None, None, -1.0
+    
+    # Debug: Count how many users have valid faces
+    valid_faces = sum(1 for r in rows if r["embedding"])
+    print(f"--> [DEBUG] Comparing against {valid_faces} valid faces in DB")
+
     for r in rows:
         if not r["embedding"]:
             continue
         try:
-            v = np.asarray(json.loads(r["embedding"]), dtype=np.float32)
-            s = cos_sim(q, v)
+            # Safer normalization (Fixes potential math bugs)
+            v = np.array(json.loads(r["embedding"]), dtype=np.float32).flatten()
+            q_flat = q.flatten()
+            
+            norm_v = np.linalg.norm(v)
+            norm_q = np.linalg.norm(q_flat)
+            
+            if norm_v == 0 or norm_q == 0:
+                s = 0.0
+            else:
+                s = float(np.dot(q_flat, v) / (norm_q * norm_v))
+
             if s > best_sim:
                 best_sid, best_name, best_sim = r["id"], r["name"], s
-        except Exception:
-            pass
+        except Exception as e:
+            print(f"Error comparing {r['id']}: {e}")
 
     sim_val = float(best_sim if best_sim is not None else 0.0)
+    
+    if best_name:
+        print(f"--> [DEBUG] Best match: {best_name} ({sim_val:.4f})")
 
     # ---------- 6) Known face above threshold ----------
     if best_sid and sim_val >= SIM_THRESHOLD:
