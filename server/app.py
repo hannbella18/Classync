@@ -3323,7 +3323,7 @@ def api_student_profile():
     
     # Check 1: Is already enrolled?
     row = cur.execute(
-        "SELECT display_name, email FROM enrollments WHERE student_id=%s AND class_id=%s",
+        "SELECT display_name, email FROM enrollments WHERE student_id=? AND class_id=?",
         (student_id, class_id)
     ).fetchone()
     
@@ -3337,7 +3337,7 @@ def api_student_profile():
         })
 
     # Check 2: Check Master Table
-    row_stu = cur.execute("SELECT name FROM students WHERE id=%s", (student_id,)).fetchone()
+    row_stu = cur.execute("SELECT name FROM students WHERE id=?", (student_id,)).fetchone()
     conn.close()
 
     # THE CRITICAL FIX: Only lock if name is NOT empty
