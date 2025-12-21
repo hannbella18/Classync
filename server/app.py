@@ -4563,7 +4563,7 @@ def api_infer():
     )
 
 # -------------------- API: Identify (single face) --------------------
-@app.post("/api/identify")
+@app.post("/api/identify", methods=["POST"])
 def api_identify():
     print("=== IDENTIFY DEBUG ===")
     print("content_type:", request.content_type)
@@ -4675,7 +4675,38 @@ def api_identify():
     # ---------- 5) Compare with existing students ----------
     conn = connect()
     cur = conn.cursor()
-    rows = cur.execute("SELECT id, name, embedding FROM students").fetchall()
+    # -------------------- Restrict matching by class (via session_id) --------------------
+    session_id = request.args.get("session_id", type=int)
+    class_id = None
+
+    if session_id:
+        try:
+            r_sess = cur.execute(
+                "SELECT class_id FROM sessions WHERE id=?",
+                (session_id,),
+            ).fetchone()
+            if r_sess and r_sess.get["class_id"]:
+                class_id = r_sess["class_id"]
+        except Exception:
+            class_id = None
+
+    # If we have class_id, only compare against students enrolled in that class
+    if class_id:
+        rows = cur.execute(
+            """
+            SELECT
+              s.id AS id,
+              COALESCE(e.display_name, s.name) AS name,
+              s.embedding AS embedding
+            FROM enrollments e
+            JOIN students s ON s.id = e.student_id
+            WHERE e.class_id = ?
+            """,
+            (class_id,),
+        ).fetchall()
+    else:
+        # fallback: old behavior (all students)
+        rows = cur.execute("SELECT id, name, embedding FROM students").fetchall()
 
     best_sid, best_name, best_sim = None, None, -1.0
     for r in rows:
@@ -4717,7 +4748,21 @@ def api_identify():
             }
         )
 
-    # ---------- 7) Handle NEW face with pending window ----------
+    # ---------- 7) If session_id/class_id is present, DO NOT create new student ----------
+    if class_id:
+        conn.close()
+        return jsonify(
+            {
+                "ok": True,
+                "pending": False,
+                "student_id": None,
+                "name": "Unknown",
+                "sim": sim_val,
+                "bbox": bbox_json,
+            }
+        )
+
+    # ---------- 8) Handle NEW face with pending window (only when class_id is NOT known) ----------
     t = time.time()
     camera_id = (request.form.get("camera_id") or "MEET_TAB").strip()
     st = PENDING_STATE.setdefault(camera_id, {"n": 0, "t0": t})

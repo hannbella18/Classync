@@ -605,7 +605,12 @@ async function handleFrameBlob(blob) {
     lastIdentifyAt = now;
 
     try {
-      const resp = await apiJpeg("/api/identify", blob);
+      const sid = CURRENT_SESSION_ID
+        ? `?session_id=${encodeURIComponent(CURRENT_SESSION_ID)}`
+        : "";
+
+      const resp = await apiJpeg(`/api/identify${sid}`, blob);
+
       if (resp && resp.ok && resp.student_id && !resp.pending) {
         IDENT.id = resp.student_id;
         IDENT.name = resp.name || "";
@@ -630,11 +635,36 @@ async function handleFrameBlob(blob) {
     lastInferAt = now;
 
     try {
-      const resp2 = await apiJpeg("/api/infer", blob);
+      const sid2 = CURRENT_SESSION_ID
+        ? `?session_id=${encodeURIComponent(CURRENT_SESSION_ID)}`
+        : "";
+
+      const resp2 = await apiJpeg(`/api/infer${sid2}`, blob);
+
       if (resp2 && resp2.ok) {
-        const state = resp2.state || "Unknown";
-        const score =
-          typeof resp2.state_score === "number" ? resp2.state_score : 0;
+        // Accept multiple possible backend keys
+        let state =
+          resp2.state ??
+          resp2.label ??
+          resp2.class_name ??
+          resp2.class ??
+          "Unknown";
+
+        let score =
+          (typeof resp2.state_score === "number" ? resp2.state_score : null) ??
+          (typeof resp2.score === "number" ? resp2.score : null) ??
+          (typeof resp2.confidence === "number" ? resp2.confidence : null) ??
+          0;
+
+        // Normalize label to "Awake"/"Drowsy" style
+        if (typeof state === "string") {
+          const s = state.trim().toLowerCase();
+          if (s === "awake" || s === "alert") state = "Awake";
+          else if (s === "drowsy" || s === "sleepy") state = "Drowsy";
+          else if (s === "unknown" || s === "") state = "Unknown";
+          else state = state.trim();
+        }
+
         const bbox = resp2.bbox || null;
 
         console.log("[Classync] infer:", state, score);
