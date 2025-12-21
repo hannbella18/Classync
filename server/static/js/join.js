@@ -155,7 +155,7 @@ document.addEventListener("DOMContentLoaded", () => {
       } catch (err) {
         console.error("[join] identify error:", err);
       }
-    }, 1500);
+    }, 700);
   }
 
   startCamera();
