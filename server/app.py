@@ -132,7 +132,7 @@ class PgConnectionWrapper:
     def execute(self, sql, params=()):
         return self.cursor().execute(sql, params)
 
-def connect():
+def connect():  
     try:
         raw_conn = psycopg2.connect(DB_URI, cursor_factory=psycopg2.extras.DictCursor)
         return PgConnectionWrapper(raw_conn)
@@ -4728,9 +4728,20 @@ def api_identify():
                 "SELECT class_id FROM sessions WHERE id=?",
                 (session_id,),
             ).fetchone()
-            if r_sess and r_sess.get["class_id"]:
-                class_id = r_sess["class_id"]
-        except Exception:
+
+            if r_sess:
+                # works for sqlite3.Row (dict-like) OR tuple
+                try:
+                    class_id = r_sess["class_id"]
+                except Exception:
+                    class_id = r_sess[0]
+
+                # normalize empty/None
+                if class_id is None:
+                    class_id = None
+
+        except Exception as e:
+            print("identify: failed to resolve class_id from session_id:", session_id, "err:", e)
             class_id = None
 
     # If we have class_id, only compare against students enrolled in that class
@@ -4738,9 +4749,9 @@ def api_identify():
         rows = cur.execute(
             """
             SELECT
-              s.id AS id,
-              COALESCE(e.display_name, s.name) AS name,
-              s.embedding AS embedding
+            s.id AS id,
+            COALESCE(e.display_name, s.name) AS name,
+            s.embedding AS embedding
             FROM enrollments e
             JOIN students s ON s.id = e.student_id
             WHERE e.class_id = ?
