@@ -37,7 +37,8 @@ document.addEventListener("DOMContentLoaded", () => {
   }
 
   /**
-   * Fetches the detailed profile (email) for a recognized ID and locks the form.
+   * Fetches the detailed profile for a recognized ID.
+   * Locks the form if the user exists (has a name), Unlocks if they are new (no name).
    */
   async function fetchProfileAndLockForm(studentId) {
     try {
@@ -52,12 +53,19 @@ document.addEventListener("DOMContentLoaded", () => {
       if (data.display_name) nameInput.value = data.display_name;
       if (data.email) emailInput.value = data.email;
 
-      // Lock fields only if the student actually exists in the DB
+      // HYBRID LOGIC FIX:
+      // If data.exists is TRUE, it means we have a Name -> Lock fields.
+      // If data.exists is FALSE, it means ID exists but Name is NULL -> Unlock fields.
       if (data.exists) {
         nameInput.readOnly = true;
         emailInput.readOnly = true;
         nameInput.classList.add("join-input-locked");
         emailInput.classList.add("join-input-locked");
+      } else {
+        nameInput.readOnly = false;
+        emailInput.readOnly = false;
+        nameInput.classList.remove("join-input-locked");
+        emailInput.classList.remove("join-input-locked");
       }
     } catch (err) {
       console.error("[join] fetchProfile error:", err);
@@ -120,26 +128,27 @@ document.addEventListener("DOMContentLoaded", () => {
       try {
         const res = await fetch("/api/identify", { method: "POST", body: formData });
         const data = await res.json().catch(() => null);
+        
+        // Safety check: if we already recognized someone, stop processing
         if (!data || !data.ok || recognizedStudentId) return;
 
         // --- Logic for Face Identification ---
+        // With the reverted backend, we ALWAYS get a student_id (no more "NEW_FACE" string)
         if (!data.pending && data.student_id) {
-          if (data.student_id === "NEW_FACE") {
-            // 1) New face detected: Let them type
-            recognizedStudentId = null; 
-            setStatus("New face detected! Please enter your details below to enroll.");
-            nameInput.readOnly = false;
-            emailInput.readOnly = false;
-            nameInput.classList.remove("join-input-locked");
-            emailInput.classList.remove("join-input-locked");
+          recognizedStudentId = data.student_id;
+
+          if (data.name) {
+             // Case 1: Existing Student (Has Name)
+             setStatus("Welcome back! We recognised you.");
+             nameInput.value = data.name;
           } else {
-            // 2) Known face recognized: Lock the form
-            recognizedStudentId = data.student_id;
-            setStatus("Welcome back! We recognised you.");
-            
-            if (data.name) nameInput.value = data.name;
-            await fetchProfileAndLockForm(data.student_id);
+             // Case 2: New/Ghost Student (No Name)
+             setStatus("Face detected! Please enter your details below to enroll.");
           }
+
+          // Fetch profile to determine if we should LOCK or UNLOCK
+          await fetchProfileAndLockForm(data.student_id);
+
           stopDetectLoop();
           return;
         }
@@ -155,7 +164,7 @@ document.addEventListener("DOMContentLoaded", () => {
       } catch (err) {
         console.error("[join] identify error:", err);
       }
-    }, 700);
+    }, 700); // Fast interval (0.7s)
   }
 
   startCamera();

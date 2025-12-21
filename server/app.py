@@ -3316,64 +3316,46 @@ def api_join_class(class_id):
 
 @app.get("/api/student_profile")
 def api_student_profile():
-    student_id = (request.args.get("student_id") or "").strip()
-    class_id = (request.args.get("class_id") or "").strip()
-
-    if not student_id:
-        return jsonify({"ok": False, "error": "missing_params"}), 400
-
-    conn = connect()
-    cur = conn.cursor()
-
-    # 1. Try finding an existing enrollment for this specific class
+    student_id = request.args.get("student_id", "").strip()
+    class_id = request.args.get("class_id", "").strip()
+    
+    conn = connect(); cur = conn.cursor()
+    
+    # Check 1: Is already enrolled?
     row = cur.execute(
-        """
-        SELECT display_name, email
-        FROM enrollments
-        WHERE student_id = %s AND class_id = %s
-        ORDER BY id DESC
-        LIMIT 1
-        """,
-        (student_id, class_id),
+        "SELECT display_name, email FROM enrollments WHERE student_id=%s AND class_id=%s",
+        (student_id, class_id)
     ).fetchone()
-
+    
     if row:
         conn.close()
-        # Student is already enrolled in this class
         return jsonify({
-            "ok": True,
-            "exists": True,  # Signals frontend to LOCK fields
-            "student_id": student_id,
-            "display_name": row["display_name"],
+            "ok": True, 
+            "exists": True, 
+            "display_name": row["display_name"], 
             "email": row["email"]
         })
 
-    # 2. Fallback: Check if the student exists in the master table from another class
-    row_stu = cur.execute(
-        "SELECT name FROM students WHERE id = %s",
-        (student_id,)
-    ).fetchone()
-    
+    # Check 2: Check Master Table
+    row_stu = cur.execute("SELECT name FROM students WHERE id=%s", (student_id,)).fetchone()
     conn.close()
 
-    # If they have a name in the master table, we treat them as "Existing"
-    if row_stu and row_stu["name"]:
+    # THE CRITICAL FIX: Only lock if name is NOT empty
+    if row_stu and row_stu["name"] and row_stu["name"].strip():
         return jsonify({
-            "ok": True,
-            "exists": True,  # Signals frontend to LOCK fields
-            "student_id": student_id,
-            "display_name": row_stu["name"],
-            "email": "" 
+            "ok": True, 
+            "exists": True,  # LOCKED
+            "display_name": row_stu["name"], 
+            "email": ""
         })
-
-    # 3. New face / No name found: Let them edit
-    return jsonify({
-        "ok": True, 
-        "exists": False, # Signals frontend to UNLOCK fields
-        "student_id": student_id,
-        "display_name": "",
-        "email": ""
-    })
+    else:
+        # ID exists (Ghost user), so UNLOCK
+        return jsonify({
+            "ok": True, 
+            "exists": False, # UNLOCKED
+            "display_name": "", 
+            "email": ""
+        })
 
 # -------------------- API: Summary & Attendance--------------------
 @app.get("/api/summary/<class_id>/hero")
@@ -4583,214 +4565,82 @@ def api_infer():
 # -------------------- API: Identify (single face) --------------------
 @app.post("/api/identify")
 def api_identify():
-    print("=== IDENTIFY DEBUG ===")
-    print("content_type:", request.content_type)
-    print("files:", list(request.files.keys()))
-    print("form:", dict(request.form))
-
-    """
-    Expect: multipart/form-data with frame=<jpeg>
-    Return: { ok, student_id, name, sim, bbox, pending }
-            - pending=True while confirming a NEW face
-    """
-
-    # ---------- 1) Get uploaded image & decode safely ----------
-    file = (
-        request.files.get("frame")
-        or request.files.get("image")
-        or request.files.get("file")
-    )
-    if file is None:
-        print("identify: no file field found")
-        return jsonify(ok=False, error="no frame"), 400
-
+    # 1. Load image
+    file = request.files.get("frame") or request.files.get("image")
+    if file is None: return jsonify(ok=False, error="no frame"), 400
     data = file.read()
-    print("identify: got", len(data), "bytes")
-
-    if not data:
-        print("identify: empty image data")
-        return jsonify(ok=False, error="empty image"), 400
-
     arr = np.frombuffer(data, np.uint8)
     img = cv2.imdecode(arr, cv2.IMREAD_COLOR)
+    if img is None: return jsonify(ok=False, error="bad image"), 400
 
-    if img is None:
-        # Save debug file so we can inspect what was received
-        ts = int(time.time())
-        debug_path = os.path.join(
-            os.path.dirname(__file__),
-            f"debug_bad_frame_{ts}.jpg",
-        )
-        with open(debug_path, "wb") as f:
-            f.write(data)
-        print("identify: imdecode failed, saved debug to", debug_path)
-        return jsonify(ok=False, error="bad image"), 400
-
-    # ---------- 2) Find largest face ----------
+    # 2. Find Face
     bbox = find_largest_face_bbox(img)
     if not bbox:
-        return jsonify(
-            {
-                "ok": True,
-                "student_id": None,
-                "name": None,
-                "sim": pfloat(0.0),
-                "bbox": None,
-                "pending": False,
-            }
-        )
-
+        return jsonify({"ok": True, "student_id": None, "pending": False})
+    
     x1, y1, x2, y2 = bbox
-    w, h = x2 - x1, y2 - y1
-    bbox_json = {"x": pint(x1), "y": pint(y1), "w": pint(w), "h": pint(h)}
+    bbox_json = {"x": pint(x1), "y": pint(y1), "w": pint(x2-x1), "h": pint(y2-y1)}
 
-    # ---------- 3) Basic quality checks ----------
-    MIN_FACE_W = 70
-    MIN_FACE_H = 70
-    if w < MIN_FACE_W or h < MIN_FACE_H:
-        return jsonify(
-            {
-                "ok": True,
-                "student_id": None,
-                "name": None,
-                "sim": pfloat(0.0),
-                "bbox": bbox_json,
-                "pending": True,
-            }
-        )
-
+    # 3. Quality Check
+    h, w = img.shape[:2]
     face_gray = cv2.cvtColor(img[y1:y2, x1:x2], cv2.COLOR_BGR2GRAY)
     if cv2.Laplacian(face_gray, cv2.CV_64F).var() < 30:
-        # too blurry
-        return jsonify(
-            {
-                "ok": True,
-                "student_id": None,
-                "name": None,
-                "sim": pfloat(0.0),
-                "bbox": bbox_json,
-                "pending": True,
-            }
-        )
+        return jsonify({"ok": True, "student_id": None, "pending": True, "bbox": bbox_json})
 
-    # ---------- 4) Embed face ----------
+    # 4. Embed
     emb_factory = get_embedder()
     res = emb_factory.embed(img[y1:y2, x1:x2])
     if not res.ok:
-        return jsonify(
-            {
-                "ok": True,
-                "student_id": None,
-                "name": None,
-                "sim": pfloat(0.0),
-                "bbox": bbox_json,
-                "pending": False,
-            }
-        )
-
+        return jsonify({"ok": True, "student_id": None, "pending": False, "bbox": bbox_json})
     q = np.asarray(res.emb, dtype=np.float32)
 
-    # ---------- 5) Compare with existing students ----------
-    conn = connect()
-    cur = conn.cursor()
+    # 5. Compare with DB
+    conn = connect(); cur = conn.cursor()
     rows = cur.execute("SELECT id, name, embedding FROM students").fetchall()
-
+    
     best_sid, best_name, best_sim = None, None, -1.0
     
-    # Debug: Count how many users have valid faces
-    valid_faces = sum(1 for r in rows if r["embedding"])
-    print(f"--> [DEBUG] Comparing against {valid_faces} valid faces in DB")
-
     for r in rows:
-        if not r["embedding"]:
-            continue
+        if not r["embedding"]: continue
         try:
-            # Safer normalization (Fixes potential math bugs)
-            v = np.array(json.loads(r["embedding"]), dtype=np.float32).flatten()
-            q_flat = q.flatten()
-            
-            norm_v = np.linalg.norm(v)
-            norm_q = np.linalg.norm(q_flat)
-            
-            if norm_v == 0 or norm_q == 0:
-                s = 0.0
-            else:
-                s = float(np.dot(q_flat, v) / (norm_q * norm_v))
-
+            v = np.asarray(json.loads(r["embedding"]), dtype=np.float32)
+            s = cos_sim(q, v)
             if s > best_sim:
                 best_sid, best_name, best_sim = r["id"], r["name"], s
-        except Exception as e:
-            print(f"Error comparing {r['id']}: {e}")
+        except: pass
 
-    sim_val = float(best_sim if best_sim is not None else 0.0)
-    
-    if best_name:
-        print(f"--> [DEBUG] Best match: {best_name} ({sim_val:.4f})")
+    # 6. Decide: Match or Create New
+    # We use 0.60 because it worked for you before!
+    FINAL_THRESHOLD = 0.60 
 
-    # ---------- 6) Known face above threshold ----------
-    if best_sid and sim_val >= SIM_THRESHOLD:
-        try:
-            merge_embedding_into(conn, best_sid, q)
-        except Exception:
-            pass
-        try:
-            cur.execute(
-                "UPDATE students SET last_seen_ts=? WHERE id=?",
-                (now_iso(), best_sid),
-            )
-            conn.commit()
-        except Exception:
-            pass
+    if best_sid and best_sim >= FINAL_THRESHOLD:
+        # EXISTING STUDENT
+        merge_embedding_into(conn, best_sid, q)
         conn.close()
-        return jsonify(
-            {
-                "ok": True,
-                "pending": False,
-                "student_id": best_sid,
-                "name": best_name,
-                "sim": sim_val,
-                "bbox": bbox_json,
-            }
+        return jsonify({
+            "ok": True, 
+            "student_id": best_sid, 
+            "name": best_name, 
+            "sim": float(best_sim), 
+            "pending": False
+        })
+    else:
+        # NEW STUDENT (Create the ID immediately)
+        new_id = mint_next_student_id()
+        cur.execute(
+            "INSERT INTO students(id, name, embedding, last_seen_ts) VALUES (?,?,?,?)",
+            (new_id, None, json.dumps(q.tolist()), now_iso())
         )
-
-    # ---------- 7) Handle NEW face (FIXED LOGIC) ----------
-    t = time.time()
-    camera_id = (request.form.get("camera_id") or "MEET_TAB").strip()
-    st = PENDING_STATE.setdefault(camera_id, {"n": 0, "t0": t})
-    
-    if t - st["t0"] > NEW_CONFIRM_WINDOW_S:
-        st["n"] = 0
-        st["t0"] = t
-    st["n"] += 1
-
-    if st["n"] >= NEW_CONFIRM_FRAMES:
-        # Verified new face, but DO NOT save to DB yet.
-        # We signal JS to let the student type manually.
-        PENDING_STATE.pop(camera_id, None)
+        conn.commit()
         conn.close()
-        return jsonify(
-            {
-                "ok": True,
-                "pending": False,
-                "student_id": "NEW_FACE",
-                "name": None,
-                "sim": sim_val,
-                "bbox": bbox_json,
-            }
-        )
-
-    # Still pending (face seen but not enough frames yet)
-    conn.close()
-    return jsonify(
-        {
-            "ok": True,
-            "pending": True,
-            "student_id": None,
-            "name": None,
-            "sim": sim_val,
-            "bbox": bbox_json,
-        }
-    )
+        
+        return jsonify({
+            "ok": True, 
+            "student_id": new_id, 
+            "name": None, 
+            "sim": 0.0, 
+            "pending": False
+        })
 
 # -------------------- API: Identify Multi (multi-person) --------------------
 @app.post("/api/identify_multi")
