@@ -3,17 +3,18 @@
 
 console.log("[Classync] content.js loaded");
 
-// ================ CONFIG ================
+// ================= CONFIG =================
 const CAPTURE_INTERVAL_MS = 3000;   // how often to grab a frame
-const JPEG_QUALITY = 0.6;          // image quality
-const IDENT_EVERY_MS = 5000;       // how often to call /api/identify
-const INFER_EVERY_MS = 3000;       // how often to call /api/infer
+const JPEG_QUALITY = 0.6;           // jpeg quality (lower = faster)
+const IDENT_EVERY_MS = 5000;        // how often to call /api/identify
+const INFER_EVERY_MS = 3000;        // how often to call /api/infer
+
 // Student-side drowsy alert settings
 let lastStudentAlertAt = 0;
 const DROWSY_ALERT_INTERVAL_MS = 30_000; // minimum 30s between beeps
 const DROWSY_ALERT_THRESHOLD = 0.70;     // confidence required to alert
 
-// ================ STATE ================
+// ================= STATE =================
 let captureTimer = null;
 let videoSource = null;      // <video> we are capturing from
 let fallbackVideo = null;    // hidden webcam video
@@ -33,28 +34,20 @@ let CURRENT_SESSION_ID = null;
 // overlay state
 let idleSeconds = 0;
 let idleTimer = null;
-let lastIdleReportedSeconds = 0;   // NEW: for idle logging
+let lastIdleReportedSeconds = 0;
 let lastStateShown = "—";
+
 // track user activity so Idle = time since last activity
 let activityHandlerAttached = false;
 
-// ==== AUTO-START/STOP flags (to avoid double binding) ====
-let joinHookAttached = false;
-let leaveHookAttached = false;
-
-// ================ HELPERS: TALK TO BACKGROUND ================
+// ================= HELPERS: TALK TO BACKGROUND =================
 
 // For JSON APIs: /api/auto/session_from_meet, /stop, /api/events, etc.
 function apiJson(path, method = "GET", bodyObj = null) {
   return new Promise((resolve) => {
     if (!chrome || !chrome.runtime || !chrome.runtime.sendMessage) {
       console.warn("[Classync] chrome.runtime not available");
-      return resolve({
-        ok: false,
-        status: 0,
-        error: "chrome.runtime not available",
-        data: null,
-      });
+      return resolve({ ok: false, status: 0, error: "chrome.runtime not available", data: null });
     }
 
     chrome.runtime.sendMessage(
@@ -67,25 +60,10 @@ function apiJson(path, method = "GET", bodyObj = null) {
       },
       (resp) => {
         if (chrome.runtime.lastError) {
-          console.warn(
-            "[Classync] API_FETCH error:",
-            chrome.runtime.lastError.message
-          );
-          return resolve({
-            ok: false,
-            status: 0,
-            error: chrome.runtime.lastError.message,
-            data: null,
-          });
+          console.warn("[Classync] API_FETCH error:", chrome.runtime.lastError.message);
+          return resolve({ ok: false, status: 0, error: chrome.runtime.lastError.message, data: null });
         }
-        if (!resp) {
-          return resolve({
-            ok: false,
-            status: 0,
-            error: "no response from background",
-            data: null,
-          });
-        }
+        if (!resp) return resolve({ ok: false, status: 0, error: "no response from background", data: null });
 
         let data = null;
         try {
@@ -94,12 +72,7 @@ function apiJson(path, method = "GET", bodyObj = null) {
           console.warn("[Classync] apiJson parse error:", e, resp.body);
         }
 
-        resolve({
-          ok: !!resp.ok,
-          status: resp.status ?? 0,
-          error: resp.error,
-          data,
-        });
+        resolve({ ok: !!resp.ok, status: resp.status ?? 0, error: resp.error, data });
       }
     );
   });
@@ -117,22 +90,11 @@ function apiJpeg(path, blob) {
     reader.onloadend = () => {
       const dataUrl = reader.result; // "data:image/jpeg;base64,..."
       chrome.runtime.sendMessage(
-        {
-          type: "API_JPEG",
-          path,
-          dataUrl,
-          cameraId: "MEET_TAB",
-        },
+        { type: "API_JPEG", path, dataUrl, cameraId: "MEET_TAB" },
         (resp) => {
           if (chrome.runtime.lastError) {
-            console.warn(
-              "[Classync] API_JPEG error:",
-              chrome.runtime.lastError.message
-            );
-            return resolve({
-              ok: false,
-              error: chrome.runtime.lastError.message,
-            });
+            console.warn("[Classync] API_JPEG error:", chrome.runtime.lastError.message);
+            return resolve({ ok: false, error: chrome.runtime.lastError.message });
           }
           resolve(resp || { ok: false, error: "no response from background" });
         }
@@ -156,8 +118,8 @@ async function sendEngagementEvent(eventType, valueObj) {
     name: IDENT.name || IDENT.id || "Unknown",
     ts: Math.floor(Date.now() / 1000),
     session_id: sid,
-    type: eventType,          // <-- important
-    value: valueObj || null,  // e.g. { duration_s: 10 }
+    type: eventType,
+    value: valueObj || null,
   });
 }
 
@@ -170,21 +132,20 @@ function playStudentAlert() {
       return;
     }
 
-    const ctx = new AudioCtx();
-    const osc = ctx.createOscillator();
-    const gain = ctx.createGain();
+    const ctxA = new AudioCtx();
+    const osc = ctxA.createOscillator();
+    const gain = ctxA.createGain();
 
     osc.type = "sine";
     osc.frequency.value = 880; // high beep
 
-    // Simple envelope: quick fade in, then fade out
-    const now = ctx.currentTime;
+    const now = ctxA.currentTime;
     gain.gain.setValueAtTime(0.001, now);
     gain.gain.exponentialRampToValueAtTime(0.2, now + 0.02);
     gain.gain.exponentialRampToValueAtTime(0.001, now + 0.4);
 
     osc.connect(gain);
-    gain.connect(ctx.destination);
+    gain.connect(ctxA.destination);
 
     osc.start(now);
     osc.stop(now + 0.45);
@@ -196,7 +157,6 @@ function playStudentAlert() {
 function maybeAlertStudent(state, score) {
   const now = Date.now();
 
-  // Only beep for strong Drowsy frames, rate-limited
   if (
     state === "Drowsy" &&
     typeof score === "number" &&
@@ -209,27 +169,19 @@ function maybeAlertStudent(state, score) {
   }
 }
 
-// ================ UI OVERLAY (GREY POPOUT) ================
+// ================= UI OVERLAY =================
 
 function logOverlayLine(text) {
   const log = document.getElementById("mm-log");
   if (!log) return;
+
   const line = document.createElement("div");
-
   const ts = new Date();
-  const timeStr = ts.toLocaleTimeString([], {
-    hour: "2-digit",
-    minute: "2-digit",
-    second: "2-digit",
-  });
-
+  const timeStr = ts.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit", second: "2-digit" });
   line.textContent = `[${timeStr}] ${text}`;
   log.prepend(line);
 
-  // keep log reasonable
-  while (log.children.length > 30) {
-    log.removeChild(log.lastChild);
-  }
+  while (log.children.length > 30) log.removeChild(log.lastChild);
 }
 
 function setNameIdLabel(text) {
@@ -252,11 +204,10 @@ function setStateLabel(state) {
   if (span) span.textContent = state;
 }
 
-// ========= Idle Reset Helpers =========
 function resetIdleTimer() {
   if (!started) return;
   idleSeconds = 0;
-  lastIdleReportedSeconds = 0;   // NEW
+  lastIdleReportedSeconds = 0;
   setIdleLabel(idleSeconds);
 }
 
@@ -314,7 +265,6 @@ function createOverlay() {
   title.appendChild(nameSpan);
   row1.appendChild(title);
 
-  // (optional) mute icon place – you can leave empty or add an icon later
   const spacer = document.createElement("div");
   spacer.style.width = "16px";
   row1.appendChild(spacer);
@@ -335,13 +285,13 @@ function createOverlay() {
   const lectBtn = document.createElement("button");
   lectBtn.id = "mm-lecturer";
   lectBtn.textContent = "Lecturer";
-  lectBtn.disabled = true; // placeholder for future use
+  lectBtn.disabled = true;
 
   row2.appendChild(startBtn);
   row2.appendChild(stopBtn);
   row2.appendChild(lectBtn);
 
-  // Status row: Idle / Tab / State
+  // Status row
   const statusRow = document.createElement("div");
   statusRow.className = "mm-status";
 
@@ -370,13 +320,9 @@ function createOverlay() {
   root.appendChild(card);
   document.body.appendChild(root);
 
-  // Button handlers (manual fallback)
-  startBtn.addEventListener("click", () => {
-    if (!started) startCapture();
-  });
-  stopBtn.addEventListener("click", () => {
-    if (started) stopCapture();
-  });
+  // Manual fallback controls
+  startBtn.addEventListener("click", () => { if (!started) startCapture(); });
+  stopBtn.addEventListener("click", () => { if (started) stopCapture(); });
 
   logOverlayLine("Overlay ready.");
 }
@@ -384,19 +330,14 @@ function createOverlay() {
 // Track tab visibility
 document.addEventListener("visibilitychange", () => {
   const visible = document.visibilityState === "visible";
-  const status = visible ? "here" : "away";
-  setTabStatus(status);
+  setTabStatus(visible ? "here" : "away");
 
-  // When capture is running, log tab_away / tab_back to backend
   if (!started) return;
-  if (visible) {
-    sendEngagementEvent("tab_back", null);
-  } else {
-    sendEngagementEvent("tab_away", null);
-  }
+  if (visible) sendEngagementEvent("tab_back", null);
+  else sendEngagementEvent("tab_away", null);
 });
 
-// ================ SESSION HELPER (matches app.py) ================
+// ================= SESSION HELPER =================
 async function ensureSessionId() {
   if (CURRENT_SESSION_ID !== null) return CURRENT_SESSION_ID;
 
@@ -418,8 +359,7 @@ async function ensureSessionId() {
   return CURRENT_SESSION_ID;
 }
 
-// ================ VIDEO SOURCE PICKER ================
-
+// ================= VIDEO SOURCE PICKER =================
 function pickMeetVideo() {
   const videos = Array.from(document.querySelectorAll("video"));
   if (!videos.length) return null;
@@ -454,10 +394,7 @@ async function ensureFallbackCamera() {
   document.body.appendChild(fallbackVideo);
 
   try {
-    const stream = await navigator.mediaDevices.getUserMedia({
-      video: true,
-      audio: false,
-    });
+    const stream = await navigator.mediaDevices.getUserMedia({ video: true, audio: false });
     fallbackVideo.srcObject = stream;
     await fallbackVideo.play();
     logOverlayLine("Fallback camera active.");
@@ -469,7 +406,7 @@ async function ensureFallbackCamera() {
   }
 }
 
-// ================ CAPTURE LOOP ================
+// ================= CAPTURE LOOP =================
 async function startCapture() {
   if (started) return;
 
@@ -480,13 +417,14 @@ async function startCapture() {
   idleSeconds = 0;
   lastIdleReportedSeconds = 0;
   setIdleLabel(idleSeconds);
+
   if (idleTimer) clearInterval(idleTimer);
   idleTimer = setInterval(() => {
     idleSeconds++;
     setIdleLabel(idleSeconds);
 
-    // Every 10s of continuous idle, send an "idle" event
     if (!started) return;
+
     const delta = idleSeconds - lastIdleReportedSeconds;
     if (idleSeconds >= 10 && delta >= 10) {
       lastIdleReportedSeconds = idleSeconds;
@@ -494,7 +432,7 @@ async function startCapture() {
     }
   }, 1000);
 
-  // Start tracking user activity
+  // Track activity
   if (!activityHandlerAttached) {
     window.addEventListener("mousemove", handleUserActivity);
     window.addEventListener("keydown", handleUserActivity);
@@ -505,7 +443,7 @@ async function startCapture() {
 
   let vid = pickMeetVideo();
   if (!vid) {
-    logOverlayLine("No Meet video/canvas yet — using fallback camera.");
+    logOverlayLine("No Meet video yet — using fallback camera.");
     console.warn("[Classync] No Meet video found, using fallback webcam.");
     vid = await ensureFallbackCamera();
   } else {
@@ -517,10 +455,7 @@ async function startCapture() {
     logOverlayLine("Error: no video source.");
     setOverlayRunning(false);
     started = false;
-    if (idleTimer) {
-      clearInterval(idleTimer);
-      idleTimer = null;
-    }
+    if (idleTimer) { clearInterval(idleTimer); idleTimer = null; }
     return;
   }
 
@@ -540,14 +475,9 @@ function stopCapture() {
   if (!started) return;
 
   started = false;
-  if (captureTimer) {
-    clearInterval(captureTimer);
-    captureTimer = null;
-  }
-  if (idleTimer) {
-    clearInterval(idleTimer);
-    idleTimer = null;
-  }
+
+  if (captureTimer) { clearInterval(captureTimer); captureTimer = null; }
+  if (idleTimer) { clearInterval(idleTimer); idleTimer = null; }
 
   // Stop tracking activity
   if (activityHandlerAttached) {
@@ -586,40 +516,33 @@ function captureFrame() {
     return;
   }
 
+  // Downscale + center-crop to model size
   const TARGET = 512;
   canvas.width = TARGET;
   canvas.height = TARGET;
 
-  // Center-crop then resize (keeps face proportion)
   const side = Math.min(vw, vh);
   const sx = (vw - side) / 2;
   const sy = (vh - side) / 2;
 
-  ctx.drawImage(
-    videoSource,
-    sx, sy, side, side,
-    0, 0, TARGET, TARGET
-  );
+  ctx.drawImage(videoSource, sx, sy, side, side, 0, 0, TARGET, TARGET);
 
   canvas.toBlob(handleFrameBlob, "image/jpeg", JPEG_QUALITY);
 }
 
-// Main per-frame logic: identify face, then infer yawning/drowsy
+// Main per-frame logic: identify face, then infer awake/drowsy
 async function handleFrameBlob(blob) {
   if (!blob || !started) return;
 
   const now = Date.now();
 
-  // 1) IDENTIFY (face recognition)
+  // 1) IDENTIFY
   if (!IDENT.id && !inflightIdentify && now - lastIdentifyAt >= IDENT_EVERY_MS) {
     inflightIdentify = true;
     lastIdentifyAt = now;
 
     try {
-      const sid = CURRENT_SESSION_ID
-        ? `?session_id=${encodeURIComponent(CURRENT_SESSION_ID)}`
-        : "";
-
+      const sid = CURRENT_SESSION_ID ? `?session_id=${encodeURIComponent(CURRENT_SESSION_ID)}` : "";
       const resp = await apiJpeg(`/api/identify${sid}`, blob);
 
       if (resp && resp.ok && resp.student_id && !resp.pending) {
@@ -627,9 +550,7 @@ async function handleFrameBlob(blob) {
         IDENT.name = resp.name || "";
         console.log("[Classync] identified:", IDENT);
         setNameIdLabel(IDENT.name || IDENT.id || "Unknown");
-        logOverlayLine(
-          `Identified as ${IDENT.name || IDENT.id || "Unknown"}.`
-        );
+        logOverlayLine(`Identified as ${IDENT.name || IDENT.id || "Unknown"}.`);
       } else {
         console.log("[Classync] identify: no match yet", resp);
       }
@@ -640,20 +561,16 @@ async function handleFrameBlob(blob) {
     }
   }
 
-  // 2) INFER (yawning / drowsy etc.) – run even if we don't have ID yet
+  // 2) INFER
   if (!inflightInfer && now - lastInferAt >= INFER_EVERY_MS) {
     inflightInfer = true;
     lastInferAt = now;
 
     try {
-      const sid2 = CURRENT_SESSION_ID
-        ? `?session_id=${encodeURIComponent(CURRENT_SESSION_ID)}`
-        : "";
-
+      const sid2 = CURRENT_SESSION_ID ? `?session_id=${encodeURIComponent(CURRENT_SESSION_ID)}` : "";
       const resp2 = await apiJpeg(`/api/infer${sid2}`, blob);
 
       if (resp2 && resp2.ok) {
-        // Accept multiple possible backend keys
         let state =
           resp2.state ??
           resp2.label ??
@@ -667,12 +584,11 @@ async function handleFrameBlob(blob) {
           (typeof resp2.confidence === "number" ? resp2.confidence : null) ??
           0;
 
-        // Normalize label to "Awake"/"Drowsy" style
+        // Normalize label
         if (typeof state === "string") {
           const s = state.trim().toLowerCase();
           if (s === "awake" || s === "alert") state = "Awake";
-          else if (s.includes("drow") || s.includes("sleep") || s.includes("yawn") || s.includes("close") || s.includes("tired"))
-          state = "Drowsy";
+          else if (s.includes("drow") || s.includes("sleep") || s.includes("yawn") || s.includes("close") || s.includes("tired")) state = "Drowsy";
           else if (s === "unknown" || s === "") state = "Unknown";
           else state = state.trim();
         }
@@ -681,15 +597,15 @@ async function handleFrameBlob(blob) {
 
         console.log("[Classync] infer:", state, score);
 
-        // Student-side drowsy alert (local beep)
+        // Student-side alert
         maybeAlertStudent(state, score);
 
-        // Update state label only when it changes to avoid spam
+        // Update overlay
         const label = state === "Unknown" ? "Unknown" : `${state}`;
         if (label !== lastStateShown) {
           lastStateShown = label;
           setStateLabel(label);
-          logOverlayLine(`State: ${label} (${score.toFixed(3)})`);
+          logOverlayLine(`State: ${label} (${Number(score).toFixed(3)})`);
         }
 
         const sid = await ensureSessionId();
@@ -715,79 +631,135 @@ async function handleFrameBlob(blob) {
   }
 }
 
-/// ==== AUTO-START/STOP (robust) ====
-// We start when we detect we're "in a call" (Leave button exists / in-call UI exists)
-// and stop when we're no longer in a call.
+// ================= AUTO-START/STOP (JOIN CLICK + FALLBACK) =================
+
+// Persist join-click intent across Meet SPA navigation
+const AUTOSTART_KEY = "classync_autostart_ts";
+
+function markAutoStartIntent() {
+  try { sessionStorage.setItem(AUTOSTART_KEY, String(Date.now())); } catch (e) {}
+}
+
+function consumeAutoStartIntent(maxAgeMs = 15_000) {
+  try {
+    const v = sessionStorage.getItem(AUTOSTART_KEY);
+    if (!v) return false;
+    const ts = parseInt(v, 10);
+    const ok = Number.isFinite(ts) && (Date.now() - ts) <= maxAgeMs;
+    if (ok) sessionStorage.removeItem(AUTOSTART_KEY);
+    return ok;
+  } catch (e) {
+    return false;
+  }
+}
+
+function isJoinAction(el) {
+  const btn = el?.closest?.("button, div[role='button']");
+  if (!btn) return false;
+
+  const text = (btn.innerText || "").trim().toLowerCase();
+  const aria = (btn.getAttribute("aria-label") || "").trim().toLowerCase();
+
+  const keys = [
+    "join now", "join", "ask to join", "request to join",
+    "enter", "continue", "admit",
+    // Malay common labels
+    "sertai", "minta untuk sertai", "mohon untuk sertai", "masuk"
+  ];
+
+  const hay = `${text} ${aria}`;
+  return keys.some(k => hay.includes(k));
+}
+
+let pendingAutoStart = false;
+let lastJoinClickAt = 0;
 
 let inCallPollTimer = null;
 let lastInCall = false;
 
 function detectInCall() {
-  // Try multiple selectors because Meet UI changes often + language may differ
   const leaveByAria = Array.from(document.querySelectorAll("button[aria-label], div[role='button'][aria-label]"))
     .find(el => {
       const a = (el.getAttribute("aria-label") || "").toLowerCase();
       return a.includes("leave") || a.includes("hang up") || a.includes("end call") ||
              a.includes("keluar") || a.includes("tamat") || a.includes("tinggalkan");
     });
-
   if (leaveByAria) return true;
 
-  // Fallback: common “in-call” UI tends to have more video tiles + controls
-  // If there is at least one video and we can find a bottom control bar-ish element
   const vids = document.querySelectorAll("video");
   if (vids && vids.length >= 1) {
-    // In-call usually has a lot of buttons; pre-join has fewer
     const buttons = document.querySelectorAll("button, div[role='button']");
     if (buttons.length > 10) return true;
   }
-
   return false;
 }
 
 function setupAutoStartStop() {
-  // Poll in-call status (lightweight)
+  // (A) Start when user clicks Join / Ask to join
+  document.addEventListener("click", (e) => {
+    if (!isJoinAction(e.target)) return;
+
+    const now = Date.now();
+    if (now - lastJoinClickAt < 1200) return;
+    lastJoinClickAt = now;
+
+    console.log("[Classync] Join button clicked -> queue auto start");
+    pendingAutoStart = true;
+    markAutoStartIntent(); // survive Meet navigation/re-render
+
+    // Try to start shortly after click (may still work if no navigation)
+    setTimeout(() => {
+      if (pendingAutoStart && !started) {
+        console.log("[Classync] Auto startCapture() after join click");
+        startCapture();
+        pendingAutoStart = false;
+      }
+    }, 1500);
+  }, true); // capture phase helps catch Meet internal handlers
+
+  // (B) Fallback: start once "in-call" is detected (if join causes re-render)
   if (inCallPollTimer) clearInterval(inCallPollTimer);
 
   inCallPollTimer = setInterval(() => {
     const inCall = detectInCall();
 
-    // Transition: NOT in call -> IN call  => start
-    if (inCall && !lastInCall) {
-      console.log("[Classync] Detected IN-CALL state -> auto startCapture()");
-      // give Meet a moment for video to stabilize
-      setTimeout(() => {
-        if (!started) startCapture();
-      }, 1200);
+    // If user clicked Join earlier and we are now in-call, start.
+    if (inCall && (pendingAutoStart || consumeAutoStartIntent()) && !started) {
+      console.log("[Classync] In-call detected after join -> auto startCapture()");
+      startCapture();
+      pendingAutoStart = false;
     }
 
-    // Transition: IN call -> NOT in call => stop
+    // Auto-stop when leaving call
     if (!inCall && lastInCall) {
-      console.log("[Classync] Detected OUT-OF-CALL state -> auto stopCapture()");
+      console.log("[Classync] Out-of-call detected -> auto stopCapture()");
       if (started) stopCapture();
+      pendingAutoStart = false;
     }
 
     lastInCall = inCall;
   }, 800);
 
-  // Auto-stop when tab closes / refresh
   window.addEventListener("beforeunload", () => {
-    if (started) {
-      console.log("[Classync] beforeunload -> auto stopCapture()");
-      stopCapture();
-    }
+    if (started) stopCapture();
   });
 }
 
-// ================ INIT ================
+// ================= INIT =================
 function init() {
   createOverlay();
-  setTabStatus(
-    document.visibilityState === "visible" ? "here" : "away"
-  );
+  setTabStatus(document.visibilityState === "visible" ? "here" : "away");
+
   console.log("[Classync] Overlay injected.");
   logOverlayLine("Ready. Detection will start when you join the meeting.");
-  setupAutoStartStop(); // <-- NEW: hook Join/Leave/close behaviour
+
+  setupAutoStartStop();
+
+  // If Meet navigated after join click, start on page load
+  if (!started && consumeAutoStartIntent()) {
+    console.log("[Classync] Auto-start intent found on init -> starting");
+    setTimeout(() => { if (!started) startCapture(); }, 1200);
+  }
 }
 
 if (document.readyState === "loading") {
