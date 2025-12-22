@@ -61,19 +61,32 @@ class Detector:
 
         # B. Run Inference
         outputs = self.session.run(None, {self.input_name: img})
-        
+
         # C. Post-processing for YOLOv8
         # [batch, 4 + classes, 8400] -> [8400, 4 + classes]
         predictions = np.squeeze(outputs[0]).T
         
         out = []
-        class_names = ["Awake", "Drowsy"] 
+        # 🔍 Detect number of classes from output (YOLOv8 format: 4 + num_classes)
+        num_classes = predictions.shape[1] - 4
+        print("[Detector] detected num_classes:", num_classes)
+
+        # ✅ Your system expects EXACTLY 2 classes: Awake, Drowsy
+        if num_classes != 2:
+            raise RuntimeError(
+                f"[Detector] WRONG MODEL: This ONNX outputs {num_classes} classes. "
+                "Classync drowsiness expects a 2-class model [Awake, Drowsy]. "
+                "Your yolov8n.onnx is likely the default COCO model. "
+                "Export your trained awake/drowsy YOLOv8 model to ONNX and replace yolov8n.onnx."
+            )
+
+        class_names = ["Awake", "Drowsy"]
 
         for i in range(len(predictions)):
             row = predictions[i]
-            scores = row[4:] 
-            class_id = np.argmax(scores)
-            confidence = scores[class_id]
+            scores = row[4:]
+            class_id = int(np.argmax(scores))
+            confidence = float(scores[class_id])
             
             if confidence > self.base_conf:
                 label = class_names[class_id] if class_id < len(class_names) else "Unknown"
