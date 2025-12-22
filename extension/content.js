@@ -4,8 +4,8 @@
 console.log("[Classync] content.js loaded");
 
 // ================ CONFIG ================
-const CAPTURE_INTERVAL_MS = 2000;   // how often to grab a frame
-const JPEG_QUALITY = 0.8;          // image quality
+const CAPTURE_INTERVAL_MS = 3000;   // how often to grab a frame
+const JPEG_QUALITY = 0.6;          // image quality
 const IDENT_EVERY_MS = 5000;       // how often to call /api/identify
 const INFER_EVERY_MS = 3000;       // how often to call /api/infer
 // Student-side drowsy alert settings
@@ -586,9 +586,20 @@ function captureFrame() {
     return;
   }
 
-  canvas.width = vw;
-  canvas.height = vh;
-  ctx.drawImage(videoSource, 0, 0, vw, vh);
+  const TARGET = 512;
+  canvas.width = TARGET;
+  canvas.height = TARGET;
+
+  // Center-crop then resize (keeps face proportion)
+  const side = Math.min(vw, vh);
+  const sx = (vw - side) / 2;
+  const sy = (vh - side) / 2;
+
+  ctx.drawImage(
+    videoSource,
+    sx, sy, side, side,
+    0, 0, TARGET, TARGET
+  );
 
   canvas.toBlob(handleFrameBlob, "image/jpeg", JPEG_QUALITY);
 }
