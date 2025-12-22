@@ -11,9 +11,9 @@ class Detector:
         # Relative paths like ".." often fail in Hugging Face Docker environments
         if weights is None:
             # Check the standard Hugging Face root directory first
-            hf_path = Path("/code/yolov8n.onnx")
+            hf_path = Path("/code/awake_drowsy.onnx")
             # Fallback to local project structure
-            local_path = Path(__file__).resolve().parent.parent / "yolov8n.onnx"
+            local_path = Path(__file__).resolve().parent.parent / "awake_drowsy.onnx"
             
             if hf_path.exists():
                 default_w = str(hf_path)
@@ -23,8 +23,11 @@ class Detector:
         self.weights = weights or default_w
         
         if not os.path.isfile(self.weights):
-            raise FileNotFoundError(f"AI Model file NOT FOUND at: {self.weights}. Please ensure yolov8n.onnx is in the root folder.")
-        
+            raise FileNotFoundError(
+                f"AI Model file NOT FOUND at: {self.weights}. "
+                "Please ensure awake_drowsy.onnx is in the root folder."
+            )
+
         # 2. FIXED PROVIDER: Use OpenVINO for stability and speed on cloud CPUs
         # This matches your requirements.txt switch to onnxruntime-openvino
         try:

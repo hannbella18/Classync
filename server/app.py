@@ -4542,7 +4542,12 @@ def api_infer():
         return jsonify({"ok": False, "error": "bad image"}), 400
 
     det = get_detector()
-    dets = det.predict_states(img)
+    try:
+        dets = det.predict_states(img)
+    except Exception as e:
+        print("INFER error:", repr(e))
+        return jsonify({"ok": False, "state": "Unknown", "state_score": 0.0, "bbox": None, "error": str(e)}), 200
+
     print("INFER dets:", dets)
 
     if not dets:
