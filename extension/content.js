@@ -715,63 +715,62 @@ async function handleFrameBlob(blob) {
   }
 }
 
-// ==== AUTO-START/STOP on Join / Leave / Tab close ====
+/// ==== AUTO-START/STOP (robust) ====
+// We start when we detect we're "in a call" (Leave button exists / in-call UI exists)
+// and stop when we're no longer in a call.
 
-// Watch DOM for "Join now" and "Leave call" buttons
+let inCallPollTimer = null;
+let lastInCall = false;
+
+function detectInCall() {
+  // Try multiple selectors because Meet UI changes often + language may differ
+  const leaveByAria = Array.from(document.querySelectorAll("button[aria-label], div[role='button'][aria-label]"))
+    .find(el => {
+      const a = (el.getAttribute("aria-label") || "").toLowerCase();
+      return a.includes("leave") || a.includes("hang up") || a.includes("end call") ||
+             a.includes("keluar") || a.includes("tamat") || a.includes("tinggalkan");
+    });
+
+  if (leaveByAria) return true;
+
+  // Fallback: common “in-call” UI tends to have more video tiles + controls
+  // If there is at least one video and we can find a bottom control bar-ish element
+  const vids = document.querySelectorAll("video");
+  if (vids && vids.length >= 1) {
+    // In-call usually has a lot of buttons; pre-join has fewer
+    const buttons = document.querySelectorAll("button, div[role='button']");
+    if (buttons.length > 10) return true;
+  }
+
+  return false;
+}
+
 function setupAutoStartStop() {
-  const observer = new MutationObserver(() => {
-    // Auto-start when "Join now" is clicked
-    if (!joinHookAttached) {
-      const joinBtn = Array.from(
-        document.querySelectorAll('button, div[role="button"]')
-      ).find(
-        (el) =>
-          el.innerText &&
-          el.innerText.trim().toLowerCase().includes("join now")
-      );
+  // Poll in-call status (lightweight)
+  if (inCallPollTimer) clearInterval(inCallPollTimer);
 
-      if (joinBtn) {
-        joinHookAttached = true;
-        console.log("[Classync] Found Join now button, binding auto-start");
-        joinBtn.addEventListener("click", () => {
-          console.log("[Classync] Join now clicked, auto-starting soon...");
-          // Wait a bit so Meet finishes joining the call & video appears
-          setTimeout(() => {
-            if (!started) {
-              console.log("[Classync] Auto-starting capture after join");
-              startCapture();
-            }
-          }, 3000);
-        });
-      }
+  inCallPollTimer = setInterval(() => {
+    const inCall = detectInCall();
+
+    // Transition: NOT in call -> IN call  => start
+    if (inCall && !lastInCall) {
+      console.log("[Classync] Detected IN-CALL state -> auto startCapture()");
+      // give Meet a moment for video to stabilize
+      setTimeout(() => {
+        if (!started) startCapture();
+      }, 1200);
     }
 
-    // Auto-stop when "Leave call" is clicked
-    if (!leaveHookAttached) {
-      const leaveBtn =
-        document.querySelector('button[aria-label="Leave call"]') ||
-        Array.from(
-          document.querySelectorAll('button, div[role="button"]')
-        ).find(
-          (el) =>
-            el.getAttribute("aria-label") &&
-            el.getAttribute("aria-label").toLowerCase().includes("leave call")
-        );
-
-      if (leaveBtn) {
-        leaveHookAttached = true;
-        console.log("[Classync] Found Leave call button, binding auto-stop");
-        leaveBtn.addEventListener("click", () => {
-          console.log("[Classync] Leave call clicked, auto-stopping capture");
-          if (started) stopCapture();
-        });
-      }
+    // Transition: IN call -> NOT in call => stop
+    if (!inCall && lastInCall) {
+      console.log("[Classync] Detected OUT-OF-CALL state -> auto stopCapture()");
+      if (started) stopCapture();
     }
-  });
 
-  observer.observe(document.body, { childList: true, subtree: true });
+    lastInCall = inCall;
+  }, 800);
 
-  // Auto-stop when tab is closed / refreshed / navigated away
+  // Auto-stop when tab closes / refresh
   window.addEventListener("beforeunload", () => {
     if (started) {
       console.log("[Classync] beforeunload -> auto stopCapture()");
