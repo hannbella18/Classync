@@ -6,7 +6,7 @@ import onnxruntime as ort
 from pathlib import Path
 
 class Detector:
-    def __init__(self, weights=None, base_conf=0.25, imgsz=640):
+    def __init__(self, weights=None, base_conf=0.25, imgsz=512):
         # 1. FIXED PATHING: Tell the server exactly where the file is
         # Relative paths like ".." often fail in Hugging Face Docker environments
         if weights is None:
