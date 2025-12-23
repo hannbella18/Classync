@@ -40,9 +40,13 @@ from flask_login import LoginManager, login_required, current_user, UserMixin, l
 # ✅ CORRECT URI (Port 5432, No Brackets)
 # Hybrid Link: Uses the AWS address (Network Safe) + Project ID Username (Tenant Safe)
 # Golden Combination: Pooler Host + Project ID Username + Transaction Port
-DB_URI = "postgresql://postgres.axddlamriytmdxuuurum:jWYgO0fNz1Rp6GAY@aws-1-ap-southeast-1.pooler.supabase.com:6543/postgres"
-SECRET_KEY = "dev-secret-change-this"
-SECURITY_PASSWORD_SALT = "classync-reset-salt-change-this"
+DB_URI = (os.getenv("DB_URI") or "").strip()
+if not DB_URI:
+    raise RuntimeError("DB_URI is not set. Add it in Hugging Face Secrets.")
+
+SECRET_KEY = os.getenv("SECRET_KEY", "dev-secret-change-this")
+SECURITY_PASSWORD_SALT = os.getenv("SECURITY_PASSWORD_SALT", "classync-reset-salt-change-this")
+
 EMAIL_ADDRESS = os.environ.get("CLASSYNC_EMAIL_ADDRESS", "your_email@gmail.com")
 EMAIL_PASSWORD = os.environ.get("CLASSYNC_EMAIL_PASSWORD", "your-app-password")
 
@@ -134,7 +138,15 @@ class PgConnectionWrapper:
 
 def connect():  
     try:
-        raw_conn = psycopg2.connect(DB_URI, cursor_factory=psycopg2.extras.DictCursor)
+        raw_conn = psycopg2.connect(
+            DB_URI,
+            cursor_factory=psycopg2.extras.DictCursor,
+            connect_timeout=10,
+            keepalives=1,
+            keepalives_idle=30,
+            keepalives_interval=10,
+            keepalives_count=5,
+        )
         return PgConnectionWrapper(raw_conn)
     except Exception as e:
         print(f"❌ DB Connection Failed: {e}")
@@ -176,7 +188,46 @@ def init_db():
     conn.close()
     print("✅ Database connected & initialized!")
 
-init_db()
+DB_READY = False
+
+def init_db_with_retry(max_tries=12, sleep_s=3):
+    global DB_READY
+    for attempt in range(1, max_tries + 1):
+        try:
+            init_db()
+            DB_READY = True
+            print(f"[db] init_db OK (attempt {attempt})")
+            return True
+        except psycopg2.OperationalError as e:
+            print(f"[db] init_db failed (attempt {attempt}/{max_tries}): {e}")
+            time.sleep(sleep_s)
+        except Exception as e:
+            print(f"[db] init_db unexpected error: {e}")
+            time.sleep(sleep_s)
+
+    DB_READY = False
+    print("[db] init_db ultimately failed, app will still run but DB endpoints may fail.")
+    return False
+
+try:
+    init_db_with_retry()
+except Exception as e:
+    print("[db] init_db_with_retry crashed unexpectedly:", e)
+
+_db_inited = False
+
+@app.before_request
+def _ensure_db_once():
+    global _db_inited
+    if _db_inited:
+        return
+    try:
+        init_db()
+        _db_inited = True
+    except Exception as e:
+        print("❌ init_db failed (will retry next request):", e)
+        # Don't crash the worker; just return 503 for now
+        return jsonify({"ok": False, "error": "Database not ready"}), 503
 
 class User(UserMixin):
     def __init__(self, id, name, email, role):
@@ -879,33 +930,6 @@ def login():
         return render_template("login.html", error="Invalid email or password")
 
     return render_template("login.html")
-
-# --- TEMPORARY FIX ROUTE (UPDATED) ---
-@app.route("/fix-my-db")
-def fix_my_db():
-    conn = connect()
-    cur = conn.cursor()
-    
-    # 1. Fix Admin (Password: admin123)
-    admin_hash = generate_password_hash("admin123")
-    cur.execute("""
-        UPDATE users 
-        SET pw_hash = ?, role = 'admin' 
-        WHERE email = 'admin@upm.edu.my'
-    """, (admin_hash,))
-    
-    # 2. Fix Lecturer (Password: Hannis@18)
-    # I am using the email exactly as seen in your screenshot
-    lecturer_hash = generate_password_hash("Hannis@18")
-    cur.execute("""
-        UPDATE users 
-        SET pw_hash = ?, role = 'lecturer'
-        WHERE email = 'nurfarhannis4@gmail.com'
-    """, (lecturer_hash,))
-    
-    conn.commit()
-    conn.close()
-    return "✅ SUCCESS: Admin pass is 'admin123'. Lecturer pass is 'Hannis@18'. Go Login!"
 
 @app.route("/signup", methods=["GET", "POST"])
 def signup():
