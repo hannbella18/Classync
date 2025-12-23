@@ -4,20 +4,23 @@
 console.log("[Classync] content.js loaded");
 
 // ================= CONFIG =================
-const CAPTURE_INTERVAL_MS = 3000;   // how often to grab a frame
-const JPEG_QUALITY = 0.6;           // jpeg quality (lower = faster)
-const IDENT_EVERY_MS = 5000;        // how often to call /api/identify
-const INFER_EVERY_MS = 3000;        // how often to call /api/infer
+const CAPTURE_INTERVAL_MS = 2000;   // how often to grab a frame
+const JPEG_QUALITY = 0.5;           // jpeg quality (lower = faster)
+const IDENT_EVERY_MS = 2500;        // how often to call /api/identify
+const INFER_EVERY_MS = 1500;        // how often to call /api/infer
 
 // Student-side drowsy alert settings
 let lastStudentAlertAt = 0;
-const DROWSY_ALERT_INTERVAL_MS = 30_000; // minimum 30s between beeps
+const DROWSY_ALERT_INTERVAL_MS = 30_000; // min 30s between beeps
 const DROWSY_ALERT_THRESHOLD = 0.70;     // confidence required to alert
+
+// Persist join-click intent across Meet SPA navigation
+const AUTOSTART_KEY = "classync_autostart_ts";
 
 // ================= STATE =================
 let captureTimer = null;
-let videoSource = null;      // <video> we are capturing from
-let fallbackVideo = null;    // hidden webcam video
+let videoSource = null;
+let fallbackVideo = null;
 let canvas = null;
 let ctx = null;
 
@@ -36,11 +39,35 @@ let idleSeconds = 0;
 let idleTimer = null;
 let lastIdleReportedSeconds = 0;
 let lastStateShown = "—";
-
-// track user activity so Idle = time since last activity
 let activityHandlerAttached = false;
 
-// ================= HELPERS: TALK TO BACKGROUND =================
+// AUTO-START/STOP state
+let pendingAutoStart = false;
+let lastJoinClickAt = 0;
+let inCallPollTimer = null;
+let lastInCall = false;
+
+// Audio unlock (Chrome requires user gesture for sound)
+let audioUnlocked = false;
+let sharedAudioCtx = null;
+
+// ================= HELPERS =================
+function markAutoStartIntent() {
+  try { sessionStorage.setItem(AUTOSTART_KEY, String(Date.now())); } catch (e) {}
+}
+
+function consumeAutoStartIntent(maxAgeMs = 15_000) {
+  try {
+    const v = sessionStorage.getItem(AUTOSTART_KEY);
+    if (!v) return false;
+    const ts = parseInt(v, 10);
+    const ok = Number.isFinite(ts) && (Date.now() - ts) <= maxAgeMs;
+    if (ok) sessionStorage.removeItem(AUTOSTART_KEY);
+    return ok;
+  } catch (e) {
+    return false;
+  }
+}
 
 // For JSON APIs: /api/auto/session_from_meet, /stop, /api/events, etc.
 function apiJson(path, method = "GET", bodyObj = null) {
@@ -104,73 +131,7 @@ function apiJpeg(path, blob) {
   });
 }
 
-// ========= Engagement events helper (idle, tab-away) =========
-async function sendEngagementEvent(eventType, valueObj) {
-  if (!started) return;
-
-  const sid = await ensureSessionId();
-  if (!sid) return;
-
-  await apiJson("/api/events", "POST", {
-    course_id: "CSC4400",
-    camera_id: "MEET_TAB",
-    student_id: IDENT.id || null,
-    name: IDENT.name || IDENT.id || "Unknown",
-    ts: Math.floor(Date.now() / 1000),
-    session_id: sid,
-    type: eventType,
-    value: valueObj || null,
-  });
-}
-
-// ========= Student drowsy alert (local beep) =========
-function playStudentAlert() {
-  try {
-    const AudioCtx = window.AudioContext || window.webkitAudioContext;
-    if (!AudioCtx) {
-      console.warn("[Classync] No AudioContext available for alert");
-      return;
-    }
-
-    const ctxA = new AudioCtx();
-    const osc = ctxA.createOscillator();
-    const gain = ctxA.createGain();
-
-    osc.type = "sine";
-    osc.frequency.value = 880; // high beep
-
-    const now = ctxA.currentTime;
-    gain.gain.setValueAtTime(0.001, now);
-    gain.gain.exponentialRampToValueAtTime(0.2, now + 0.02);
-    gain.gain.exponentialRampToValueAtTime(0.001, now + 0.4);
-
-    osc.connect(gain);
-    gain.connect(ctxA.destination);
-
-    osc.start(now);
-    osc.stop(now + 0.45);
-  } catch (e) {
-    console.warn("[Classync] student alert sound failed:", e);
-  }
-}
-
-function maybeAlertStudent(state, score) {
-  const now = Date.now();
-
-  if (
-    state === "Drowsy" &&
-    typeof score === "number" &&
-    score >= DROWSY_ALERT_THRESHOLD &&
-    now - lastStudentAlertAt >= DROWSY_ALERT_INTERVAL_MS
-  ) {
-    lastStudentAlertAt = now;
-    console.log("[Classync] triggering student drowsy alert", score);
-    playStudentAlert();
-  }
-}
-
-// ================= UI OVERLAY =================
-
+// ================= OVERLAY UI =================
 function logOverlayLine(text) {
   const log = document.getElementById("mm-log");
   if (!log) return;
@@ -239,7 +200,7 @@ function createOverlay() {
   const card = document.createElement("div");
   card.className = "mm-card";
 
-  // Header: name / id
+  // Header
   const row1 = document.createElement("div");
   row1.className = "mm-row";
   row1.style.justifyContent = "space-between";
@@ -252,7 +213,6 @@ function createOverlay() {
   const nameSpan = document.createElement("span");
   nameSpan.id = "mm-name";
 
-  // animated "Detecting..."
   const detect = document.createElement("span");
   detect.id = "mm-detecting";
   detect.textContent = "Detecting";
@@ -269,7 +229,7 @@ function createOverlay() {
   spacer.style.width = "16px";
   row1.appendChild(spacer);
 
-  // Row 2: buttons
+  // Buttons
   const row2 = document.createElement("div");
   row2.className = "mm-row";
 
@@ -308,7 +268,6 @@ function createOverlay() {
   statusRow.appendChild(tabSpan);
   statusRow.appendChild(stateSpan);
 
-  // Log area
   const logBox = document.createElement("div");
   logBox.id = "mm-log";
 
@@ -321,7 +280,7 @@ function createOverlay() {
   document.body.appendChild(root);
 
   // Manual fallback controls
-  startBtn.addEventListener("click", () => { if (!started) startCapture(); });
+  startBtn.addEventListener("click", () => { unlockAudioOnce(); if (!started) startCapture(); });
   stopBtn.addEventListener("click", () => { if (started) stopCapture(); });
 
   logOverlayLine("Overlay ready.");
@@ -337,7 +296,71 @@ document.addEventListener("visibilitychange", () => {
   else sendEngagementEvent("tab_away", null);
 });
 
-// ================= SESSION HELPER =================
+// ================= AUDIO (BEEP) =================
+function unlockAudioOnce() {
+  if (audioUnlocked) return;
+
+  const AudioCtx = window.AudioContext || window.webkitAudioContext;
+  if (!AudioCtx) return;
+
+  try {
+    sharedAudioCtx = sharedAudioCtx || new AudioCtx();
+    if (sharedAudioCtx.state === "suspended") sharedAudioCtx.resume();
+    audioUnlocked = true;
+    console.log("[Classync] Audio unlocked");
+    logOverlayLine("Audio unlocked (alerts enabled).");
+  } catch (e) {
+    console.warn("[Classync] unlockAudioOnce failed:", e);
+  }
+}
+
+function playStudentAlert() {
+  try {
+    const AudioCtx = window.AudioContext || window.webkitAudioContext;
+    if (!AudioCtx) return;
+
+    // Reuse the shared audio context (more reliable + lighter)
+    const ctxA = sharedAudioCtx || new AudioCtx();
+    sharedAudioCtx = ctxA;
+
+    if (ctxA.state === "suspended") ctxA.resume();
+
+    const osc = ctxA.createOscillator();
+    const gain = ctxA.createGain();
+
+    osc.type = "sine";
+    osc.frequency.value = 880;
+
+    const now = ctxA.currentTime;
+    gain.gain.setValueAtTime(0.001, now);
+    gain.gain.exponentialRampToValueAtTime(0.2, now + 0.02);
+    gain.gain.exponentialRampToValueAtTime(0.001, now + 0.4);
+
+    osc.connect(gain);
+    gain.connect(ctxA.destination);
+
+    osc.start(now);
+    osc.stop(now + 0.45);
+  } catch (e) {
+    console.warn("[Classync] student alert sound failed:", e);
+  }
+}
+
+function maybeAlertStudent(state, score) {
+  const now = Date.now();
+  if (
+    state === "Drowsy" &&
+    typeof score === "number" &&
+    score >= DROWSY_ALERT_THRESHOLD &&
+    now - lastStudentAlertAt >= DROWSY_ALERT_INTERVAL_MS
+  ) {
+    lastStudentAlertAt = now;
+    console.log("[Classync] triggering student drowsy alert", score);
+    playStudentAlert();
+  }
+}
+
+// ================= SESSION + EVENTS =================
 async function ensureSessionId() {
   if (CURRENT_SESSION_ID !== null) return CURRENT_SESSION_ID;
 
@@ -359,7 +382,25 @@ async function ensureSessionId() {
   return CURRENT_SESSION_ID;
 }
 
-// ================= VIDEO SOURCE PICKER =================
+async function sendEngagementEvent(eventType, valueObj) {
+  if (!started) return;
+
+  const sid = await ensureSessionId();
+  if (!sid) return;
+
+  await apiJson("/api/events", "POST", {
+    course_id: "CSC4400",
+    camera_id: "MEET_TAB",
+    student_id: IDENT.id || null,
+    name: IDENT.name || IDENT.id || "Unknown",
+    ts: Math.floor(Date.now() / 1000),
+    session_id: sid,
+    type: eventType,
+    value: valueObj || null,
+  });
+}
+
+// ================= VIDEO SOURCE =================
 function pickMeetVideo() {
   const videos = Array.from(document.querySelectorAll("video"));
   if (!videos.length) return null;
@@ -378,7 +419,6 @@ function pickMeetVideo() {
   return best;
 }
 
-// Fallback: webcam using getUserMedia
 async function ensureFallbackCamera() {
   if (fallbackVideo && fallbackVideo.srcObject) return fallbackVideo;
 
@@ -432,7 +472,6 @@ async function startCapture() {
     }
   }, 1000);
 
-  // Track activity
   if (!activityHandlerAttached) {
     window.addEventListener("mousemove", handleUserActivity);
     window.addEventListener("keydown", handleUserActivity);
@@ -479,7 +518,6 @@ function stopCapture() {
   if (captureTimer) { clearInterval(captureTimer); captureTimer = null; }
   if (idleTimer) { clearInterval(idleTimer); idleTimer = null; }
 
-  // Stop tracking activity
   if (activityHandlerAttached) {
     window.removeEventListener("mousemove", handleUserActivity);
     window.removeEventListener("keydown", handleUserActivity);
@@ -492,7 +530,6 @@ function stopCapture() {
   console.log("[Classync] Capture stopped.");
   logOverlayLine("Stopped.");
 
-  // Best-effort stop on backend
   (async () => {
     try {
       const sid = CURRENT_SESSION_ID;
@@ -516,7 +553,6 @@ function captureFrame() {
     return;
   }
 
-  // Downscale + center-crop to model size
   const TARGET = 512;
   canvas.width = TARGET;
   canvas.height = TARGET;
@@ -526,22 +562,23 @@ function captureFrame() {
   const sy = (vh - side) / 2;
 
   ctx.drawImage(videoSource, sx, sy, side, side, 0, 0, TARGET, TARGET);
-
   canvas.toBlob(handleFrameBlob, "image/jpeg", JPEG_QUALITY);
 }
 
-// Main per-frame logic: identify face, then infer awake/drowsy
+// ================= MAIN PER-FRAME =================
 async function handleFrameBlob(blob) {
   if (!blob || !started) return;
 
   const now = Date.now();
 
   // 1) IDENTIFY
-  if (!IDENT.id && !inflightIdentify && now - lastIdentifyAt >= IDENT_EVERY_MS) {
+  if (!inflightIdentify && now - lastIdentifyAt >= IDENT_EVERY_MS) {
     inflightIdentify = true;
     lastIdentifyAt = now;
 
     try {
+      logOverlayLine("Trying face recognition…");
+
       const sid = CURRENT_SESSION_ID ? `?session_id=${encodeURIComponent(CURRENT_SESSION_ID)}` : "";
       const resp = await apiJpeg(`/api/identify${sid}`, blob);
 
@@ -553,9 +590,11 @@ async function handleFrameBlob(blob) {
         logOverlayLine(`Identified as ${IDENT.name || IDENT.id || "Unknown"}.`);
       } else {
         console.log("[Classync] identify: no match yet", resp);
+        logOverlayLine("No face match yet.");
       }
     } catch (e) {
       console.warn("[Classync] identify error:", e);
+      logOverlayLine("Identify error (see console).");
     } finally {
       inflightIdentify = false;
     }
@@ -584,7 +623,6 @@ async function handleFrameBlob(blob) {
           (typeof resp2.confidence === "number" ? resp2.confidence : null) ??
           0;
 
-        // Normalize label
         if (typeof state === "string") {
           const s = state.trim().toLowerCase();
           if (s === "awake" || s === "alert") state = "Awake";
@@ -597,7 +635,7 @@ async function handleFrameBlob(blob) {
 
         console.log("[Classync] infer:", state, score);
 
-        // Student-side alert
+        // Student beep (local)
         maybeAlertStudent(state, score);
 
         // Update overlay
@@ -631,28 +669,7 @@ async function handleFrameBlob(blob) {
   }
 }
 
-// ================= AUTO-START/STOP (JOIN CLICK + FALLBACK) =================
-
-// Persist join-click intent across Meet SPA navigation
-const AUTOSTART_KEY = "classync_autostart_ts";
-
-function markAutoStartIntent() {
-  try { sessionStorage.setItem(AUTOSTART_KEY, String(Date.now())); } catch (e) {}
-}
-
-function consumeAutoStartIntent(maxAgeMs = 15_000) {
-  try {
-    const v = sessionStorage.getItem(AUTOSTART_KEY);
-    if (!v) return false;
-    const ts = parseInt(v, 10);
-    const ok = Number.isFinite(ts) && (Date.now() - ts) <= maxAgeMs;
-    if (ok) sessionStorage.removeItem(AUTOSTART_KEY);
-    return ok;
-  } catch (e) {
-    return false;
-  }
-}
-
+// ================= AUTO START/STOP =================
 function isJoinAction(el) {
   const btn = el?.closest?.("button, div[role='button']");
   if (!btn) return false;
@@ -663,7 +680,6 @@ function isJoinAction(el) {
   const keys = [
     "join now", "join", "ask to join", "request to join",
     "enter", "continue", "admit",
-    // Malay common labels
     "sertai", "minta untuk sertai", "mohon untuk sertai", "masuk"
   ];
 
@@ -671,19 +687,27 @@ function isJoinAction(el) {
   return keys.some(k => hay.includes(k));
 }
 
-let pendingAutoStart = false;
-let lastJoinClickAt = 0;
+function isLeaveAction(el) {
+  const btn = el?.closest?.("button, div[role='button']");
+  if (!btn) return false;
 
-let inCallPollTimer = null;
-let lastInCall = false;
+  const text = (btn.innerText || "").trim().toLowerCase();
+  const aria = (btn.getAttribute("aria-label") || "").trim().toLowerCase();
+  const hay = `${text} ${aria}`;
 
+  const keys = ["leave", "leave call", "hang up", "end call", "keluar", "tinggalkan", "tamat", "tamatkan"];
+  return keys.some(k => hay.includes(k));
+}
+
+// In-call detection (fallback)
 function detectInCall() {
-  const leaveByAria = Array.from(document.querySelectorAll("button[aria-label], div[role='button'][aria-label]"))
-    .find(el => {
-      const a = (el.getAttribute("aria-label") || "").toLowerCase();
-      return a.includes("leave") || a.includes("hang up") || a.includes("end call") ||
-             a.includes("keluar") || a.includes("tamat") || a.includes("tinggalkan");
-    });
+  const leaveByAria = Array.from(
+    document.querySelectorAll("button[aria-label], div[role='button'][aria-label]")
+  ).find(el => {
+    const a = (el.getAttribute("aria-label") || "").toLowerCase();
+    return a.includes("leave") || a.includes("hang up") || a.includes("end call") ||
+           a.includes("keluar") || a.includes("tamat") || a.includes("tinggalkan");
+  });
   if (leaveByAria) return true;
 
   const vids = document.querySelectorAll("video");
@@ -695,7 +719,7 @@ function detectInCall() {
 }
 
 function setupAutoStartStop() {
-  // (A) Start when user clicks Join / Ask to join
+  // A) Start when user clicks Join / Ask to join
   document.addEventListener("click", (e) => {
     if (!isJoinAction(e.target)) return;
 
@@ -705,9 +729,11 @@ function setupAutoStartStop() {
 
     console.log("[Classync] Join button clicked -> queue auto start");
     pendingAutoStart = true;
-    markAutoStartIntent(); // survive Meet navigation/re-render
+    markAutoStartIntent();
 
-    // Try to start shortly after click (may still work if no navigation)
+    // 🔥 unlock audio so beeps work even with auto-start
+    unlockAudioOnce();
+
     setTimeout(() => {
       if (pendingAutoStart && !started) {
         console.log("[Classync] Auto startCapture() after join click");
@@ -715,22 +741,28 @@ function setupAutoStartStop() {
         pendingAutoStart = false;
       }
     }, 1500);
-  }, true); // capture phase helps catch Meet internal handlers
+  }, true);
 
-  // (B) Fallback: start once "in-call" is detected (if join causes re-render)
+  // B) Stop immediately when user clicks Leave/End
+  document.addEventListener("click", (e) => {
+    if (!isLeaveAction(e.target)) return;
+    console.log("[Classync] Leave clicked -> stopCapture()");
+    if (started) stopCapture();
+    pendingAutoStart = false;
+  }, true);
+
+  // C) Fallback poll: start once in-call is detected; stop when out-of-call
   if (inCallPollTimer) clearInterval(inCallPollTimer);
 
   inCallPollTimer = setInterval(() => {
     const inCall = detectInCall();
 
-    // If user clicked Join earlier and we are now in-call, start.
     if (inCall && (pendingAutoStart || consumeAutoStartIntent()) && !started) {
       console.log("[Classync] In-call detected after join -> auto startCapture()");
       startCapture();
       pendingAutoStart = false;
     }
 
-    // Auto-stop when leaving call
     if (!inCall && lastInCall) {
       console.log("[Classync] Out-of-call detected -> auto stopCapture()");
       if (started) stopCapture();
