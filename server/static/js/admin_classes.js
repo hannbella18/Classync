@@ -11,10 +11,8 @@ document.addEventListener("DOMContentLoaded", () => {
   const courseNameInput = document.getElementById("course_name");
   const groupInput = document.getElementById("group_name");
   const lecturerSelect = document.getElementById("lecturer_id");
-  const modeSelect = document.getElementById("mode");
-  const deptSelect = document.getElementById("dept_id");
+  const modeInput = document.getElementById("mode"); // now readonly input  const deptSelect = document.getElementById("dept_id");
   const linkInput = document.getElementById("platform_link");
-  const locationInput = document.getElementById("location");
   const daySelect = document.getElementById("day_of_week");
   const timeStartInput = document.getElementById("time_start");
   const timeEndInput = document.getElementById("time_end");
@@ -23,35 +21,23 @@ document.addEventListener("DOMContentLoaded", () => {
   const editClassIdInput = document.getElementById("edit_class_id");
   const submitBtn = document.querySelector("#addClassForm .primary-btn");
 
-  const locationWrapper = document.getElementById("location-wrapper");
   const linkWrapper = document.getElementById("link-wrapper");
 
   const searchInput = document.getElementById("classSearch");
-  const modeFilter = document.getElementById("classFilterMode");
   const deptFilter = document.getElementById("classFilterDept");
   const rows = document.querySelectorAll(".classes-table tbody .class-row");
 
   // ---------- Helpers ----------
 
   function updateModeFields() {
-    const mode = (modeSelect.value || "").toLowerCase();
-
-    if (mode === "physical") {
-      locationWrapper.style.display = "block";
-      linkWrapper.style.display = "none";
-    } else if (mode === "online") {
-      locationWrapper.style.display = "none";
-      linkWrapper.style.display = "block";
-    } else {
-      // hybrid
-      locationWrapper.style.display = "block";
-      linkWrapper.style.display = "block";
-    }
+    if (linkWrapper) linkWrapper.style.display = "block";
   }
 
   function resetForm() {
     // Reset the whole form fields
     form.reset();
+
+    if (modeInput) modeInput.value = "Online";
 
     // Clear hidden edit flags
     isEditInput.value = "";
@@ -77,7 +63,6 @@ document.addEventListener("DOMContentLoaded", () => {
 
   function applyClassFilters() {
     const term = (searchInput?.value || "").toLowerCase().trim();
-    const modeValue = modeFilter ? modeFilter.value : "all";
     const deptValue = deptFilter ? deptFilter.value : "all";
 
     rows.forEach((row) => {
@@ -85,7 +70,6 @@ document.addEventListener("DOMContentLoaded", () => {
       const code = (row.dataset.code || "").toLowerCase();
       const group = (row.dataset.group || "").toLowerCase();
       const lecturer = (row.dataset.lecturer || "").toLowerCase();
-      const rowMode = row.dataset.mode || "";
       const rowDept = row.dataset.dept || "";
 
       // text match
@@ -96,24 +80,17 @@ document.addEventListener("DOMContentLoaded", () => {
         group.includes(term) ||
         lecturer.includes(term);
 
-      // mode match
-      const modeMatch =
-        modeValue === "all" || rowMode === modeValue;
-
       // dept match
       const deptMatch =
         deptValue === "all" || rowDept === deptValue;
 
-      const show = textMatch && modeMatch && deptMatch;
+      const show = textMatch && deptMatch;
       row.style.display = show ? "" : "none";
     });
   }
 
   if (searchInput) {
     searchInput.addEventListener("input", applyClassFilters);
-  }
-  if (modeFilter) {
-    modeFilter.addEventListener("change", applyClassFilters);
   }
   if (deptFilter) {
     deptFilter.addEventListener("change", applyClassFilters);
@@ -131,7 +108,6 @@ document.addEventListener("DOMContentLoaded", () => {
 
   // ---------- Mode show/hide ----------
 
-  modeSelect.addEventListener("change", updateModeFields);
   updateModeFields(); // initial
 
   // ---------- Edit buttons ----------
@@ -146,7 +122,6 @@ document.addEventListener("DOMContentLoaded", () => {
       const lecturerId = btn.dataset.lecturerId || "";
       const mode = btn.dataset.mode || "Online";
       const deptId = btn.dataset.deptId || "";
-      const location = btn.dataset.location || "";
       const link = btn.dataset.link || "";
       const day = btn.dataset.day || "";
       const timeStart = (btn.dataset.timeStart || "").slice(0, 5);
@@ -157,9 +132,8 @@ document.addEventListener("DOMContentLoaded", () => {
       courseNameInput.value = name;
       groupInput.value = group;
       if (lecturerId) lecturerSelect.value = lecturerId;
-      modeSelect.value = mode;
       if (deptId) deptSelect.value = deptId;
-      locationInput.value = location;
+      if (modeInput) modeInput.value = "Online";
       linkInput.value = link;
       if (day) daySelect.value = day;
       if (timeStart) timeStartInput.value = timeStart;
