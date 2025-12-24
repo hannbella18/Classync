@@ -1382,6 +1382,22 @@ body {
   padding: 0 !important;
 }
 
+/* Make extra classes look like mini cards (same visual family) */
+.upcoming-extra-cards {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  margin-top: 10px;
+}
+
+.upcoming-extra-card {
+  background: #f8fbff;
+  border: 1px solid rgba(2, 43, 114, 0.08);
+  border-radius: 14px;
+  padding: 10px 12px;
+  box-shadow: 0 8px 16px rgba(15, 35, 52, 0.03);
+}
+
 /* ============ RESPONSIVE ============ */
 
 @media (max-width: 1180px) {

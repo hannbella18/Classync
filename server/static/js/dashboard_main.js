@@ -175,7 +175,7 @@ document.addEventListener("DOMContentLoaded", () => {
     // Tag
     upcomingTag.style.display = "inline-flex";
     upcomingTag.textContent =
-      others.length > 0 ? "Next class" : "Only class today";
+      others.length > 0 ? "Class today" : "Only class today";
 
     // Main class title
     const mainLabel = `${main.class_id} – ${main.class_name || ""}`;
@@ -195,13 +195,17 @@ document.addEventListener("DOMContentLoaded", () => {
     }
     upcomingMeta.textContent = `${mainTime} · ${mainLocMode}`;
 
-    // ----- Also today list -----
+    // ----- Also today (render same UI style as main card) -----
     if (extraList && others.length > 0) {
       others.forEach((cls) => {
-        const li = document.createElement("li");
+        const card = document.createElement("div");
+        card.className = "upcoming-extra-card";
 
-        const label = `${cls.class_id} – ${cls.class_name || ""}`;
-        const time  =
+        const title = document.createElement("div");
+        title.className = "upcoming-title";
+        title.textContent = `${cls.class_id} – ${cls.class_name || ""}`;
+
+        const time =
           `${formatTime12h(cls.time_start)} – ${formatTime12h(cls.time_end)}`;
 
         let loc = "";
@@ -213,8 +217,13 @@ document.addEventListener("DOMContentLoaded", () => {
           loc = cls.delivery_mode;
         }
 
-        li.textContent = `${label} · ${time} · ${loc}`;
-        extraList.appendChild(li);
+        const meta = document.createElement("div");
+        meta.className = "upcoming-meta";
+        meta.textContent = `${time} · ${loc}`;
+
+        card.appendChild(title);
+        card.appendChild(meta);
+        extraList.appendChild(card);
       });
     }
   }
