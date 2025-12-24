@@ -22,6 +22,7 @@ document.addEventListener("DOMContentLoaded", () => {
   const engagementBody = document.getElementById("engagementBody");
 
   let currentSessionId = null;
+  let totalSessionsCount = 0; // ✅ total sessions in this class (from dropdown API)
 
   const liveRefreshBtn = document.querySelector("[data-role='live-refresh']");
   if (liveRefreshBtn) {
@@ -235,9 +236,9 @@ document.addEventListener("DOMContentLoaded", () => {
 
       const statuses = [
         { key: "present", label: "Present" },
-        { key: "late", label: "Late" },
         { key: "absent", label: "Absent" },
       ];
+
       const currStatus = String(row.attendance_status || "").toLowerCase();
 
       statuses.forEach((st) => {
@@ -261,11 +262,26 @@ document.addEventListener("DOMContentLoaded", () => {
       tr.appendChild(attTd);
 
 
-      // Average attendance
+      // Average attendance (across ALL sessions)
+      let computedAvg = null;
+
+      // ✅ If backend already provides ANY of these fields, we can compute correctly:
+      const attended =
+        row.attended_sessions ??
+        row.present_sessions ??
+        row.sessions_attended ??
+        row.attendance_count ??
+        null;
+
+      if (attended != null && totalSessionsCount > 0) {
+        computedAvg = (Number(attended) / totalSessionsCount) * 100;
+      }
+
       const avgAttText =
-        row.average_attendance == null
-          ? "—"
-          : `${Math.round(row.average_attendance)}%`;
+        computedAvg != null
+          ? `${Math.round(computedAvg)}%`
+          : (row.average_attendance == null ? "—" : `${Math.round(row.average_attendance)}%`);
+
       tr.appendChild(makeCell(avgAttText));
 
       // Actions: Edit + Delete (icon buttons, side by side)
@@ -479,6 +495,7 @@ document.addEventListener("DOMContentLoaded", () => {
 
       const sessions = data.sessions || [];
       sessionSelect.innerHTML = "";
+      totalSessionsCount = sessions.length; // ✅ we’ll use this for avg attendance calc
 
       if (sessions.length === 0) {
         const opt = document.createElement("option");

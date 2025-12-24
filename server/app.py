@@ -34,7 +34,7 @@ from flask import (
 )
 from flask_cors import CORS
 from flask_socketio import SocketIO, emit
-from flask_login import LoginManager, login_required, current_user, UserMixin, login_user
+from flask_login import LoginManager, login_required, current_user, UserMixin, login_user, logout_user
 
 # -------------------- Config --------------------
 # ✅ CORRECT URI (Port 5432, No Brackets)
@@ -1039,6 +1039,7 @@ def reset_password(token):
 
 @app.route("/logout")
 def logout():
+    logout_user()
     session.clear()
     return redirect(url_for("login"))
 
@@ -1260,7 +1261,7 @@ def admin_create_class():
     # ================== NEW: schedule conflict check ==================
     conflict = None
     # Only check when we have full schedule info
-    if lecturer_id and day_of_week and time_start and time_end:
+    if lecturer_id and day_of_week is not None and time_start and time_end:
         conflict = cur.execute(
             """
             SELECT cs.class_id,
@@ -2498,8 +2499,9 @@ def join_class_page(class_id):
 
 @app.route("/summary")
 def summary():
+    if "user_id" not in session:
+        return redirect(url_for("login"))
     class_id = request.args.get("class_id")
-    # ✅ DEFINE user_id before using it
     user_id = session["user_id"]
 
     conn = connect()
@@ -3627,13 +3629,20 @@ def api_summary_session_engagement(class_id, session_id):
         r["student_id"]: (r["avg_eng"] or 0.0) for r in avg_eng_rows
     }
 
-    # -------- Average attendance per student across all sessions in this class
-    avg_att_rows = cur.execute(
+    # -------- Average attendance per student across ALL sessions in this class
+    # Use total sessions as denominator (not COUNT(attendance rows)),
+    # because absences usually have no row in attendance table.
+    row_total_sessions = cur.execute(
+        "SELECT COUNT(*) AS cnt FROM sessions WHERE class_id = ?",
+        (class_id,),
+    ).fetchone()
+    total_sessions = (row_total_sessions["cnt"] or 0) if row_total_sessions else 0
+
+    att_rows = cur.execute(
         """
         SELECT
           a.student_id,
-          SUM(CASE WHEN a.status = 'present' THEN 1 ELSE 0 END) AS present_cnt,
-          COUNT(*) AS total_cnt
+          SUM(CASE WHEN a.status IN ('present','late') THEN 1 ELSE 0 END) AS attended_cnt
         FROM attendance a
         JOIN sessions s ON a.session_id = s.id
         WHERE s.class_id = ?
@@ -3642,14 +3651,14 @@ def api_summary_session_engagement(class_id, session_id):
         (class_id,),
     ).fetchall()
 
+    attended_cnt_by_student = {r["student_id"]: (r["attended_cnt"] or 0) for r in att_rows}
+
     avg_att_by_student = {}
-    for r in avg_att_rows:
-        total = r["total_cnt"] or 0
-        if total > 0:
-            pct = 100.0 * (r["present_cnt"] or 0) / total
+    for sid, attended_cnt in attended_cnt_by_student.items():
+        if total_sessions > 0:
+            avg_att_by_student[sid] = 100.0 * attended_cnt / total_sessions
         else:
-            pct = None
-        avg_att_by_student[r["student_id"]] = pct
+            avg_att_by_student[sid] = None
 
     # -------- Main per-enrolment row for THIS session
     rows = cur.execute(
@@ -3719,6 +3728,10 @@ def api_summary_session_engagement(class_id, session_id):
         sid = r["student_id"]
         avg_eng = avg_eng_by_student.get(sid)
         avg_att_pct = avg_att_by_student.get(sid)
+        
+        # If student has no attendance rows at all, they attended 0 sessions
+        if avg_att_pct is None and total_sessions > 0:
+            avg_att_pct = 0.0
 
         behaviour_text = _behaviour_from_summary(r)
 
@@ -3967,8 +3980,12 @@ def api_attendance_override(class_id, session_id):
     student_id = (payload.get("student_id") or "").strip()
     status = (payload.get("status") or "").strip().lower()
 
-    if not student_id or status not in ("present", "late", "absent"):
-        return jsonify({"ok": False, "error": "bad_request"}), 400
+    # Disallow "late" overrides (treat as present or reject)
+    if status == "late":
+        status = "present"
+
+    if status not in ("present", "absent"):
+        return jsonify({"ok": False, "error": "invalid_status"}), 400
 
     conn = connect()
     cur = conn.cursor()
@@ -4414,7 +4431,7 @@ def create_event():
     Payload (JSON):
       {
         course_id, camera_id, name, student_id?, score?,
-        state?, state_score?, bbox?, ts?, type?, value?, is_lecturer?
+        state?, state_score?, bbox?, ts?, type?, value?, is_lecturer?, session_id?
       }
     """
     from datetime import datetime, timezone
@@ -4427,8 +4444,11 @@ def create_event():
     if missing:
         return jsonify({"ok": False, "error": f"missing fields: {', '.join(missing)}"}), 400
 
+    course_id    = (data.get("course_id") or "").strip()
     student_id   = (data.get("student_id") or "").strip()
     display_name = (data.get("name") or "").strip()
+    is_lecturer  = bool(data.get("is_lecturer"))
+
     state        = (data.get("state") or "").strip() or None
     state_score  = float(data.get("state_score", 0.0) or 0.0)
     score        = float(data.get("score", 0.0) or 0.0)
@@ -4436,47 +4456,29 @@ def create_event():
     ts_epoch     = float(data.get("ts", _time.time()))
     ts_iso       = datetime.fromtimestamp(ts_epoch, tz=timezone.utc).isoformat()
 
+    # Ignore unknown face labels (kept your original behavior)
     if not student_id and (
         display_name.upper() == "UNKNOWN"
         or display_name.lower().startswith("unknown")
     ):
         return jsonify({"ok": True, "ignored": "unknown"}), 200
 
-    if not student_id and display_name:
-        conn = connect(); cur = conn.cursor()
+    # ✅ HARD RULE:
+    # - Student events MUST include student_id (no auto-create from name)
+    # - Lecturer events may omit student_id
+    if not is_lecturer and not student_id:
+        return jsonify({"ok": False, "error": "student_id_required"}), 400
 
-        row = cur.execute(
-            "SELECT id FROM students WHERE name=?", (display_name,)
-        ).fetchone()
-        if row:
-            student_id = row["id"]
-        else:
-            row = cur.execute(
-                "SELECT id FROM students WHERE id LIKE 'S%%' "
-                "ORDER BY CAST(SUBSTR(id,2) AS INTEGER) DESC LIMIT 1"
-            ).fetchone()
-            next_num = (int(row["id"][1:]) if row else 0) + 1
-            student_id = f"S{next_num:03d}"
-
-            cur.execute(
-                "INSERT INTO students(id, name, embedding, last_seen_ts) "
-                "VALUES(?,?,?,?)",
-                (student_id, display_name, None, datetime.now(timezone.utc).isoformat()),
-            )
-
-        conn.commit(); conn.close()
+    if is_lecturer and not student_id:
+        student_id = "LECTURER"
 
     # Decide the event type stored in events.type
     raw_type = (data.get("type") or "").strip().lower()
-
     if raw_type:
-        # For things like "tab_away", "tab_back", "idle", "lecturer_toggle", ...
         etype = raw_type
     elif state:
-        # Normal detector events: drowsy / awake
         etype = "drowsy" if state.lower() == "drowsy" else "awake"
     else:
-        # Fallback
         etype = "sighting"
 
     value = {
@@ -4491,41 +4493,74 @@ def create_event():
             "h": int(bbox.get("h", 0)),
         },
         "name": display_name,
-        "raw_type": raw_type,           # normalized type
-        "raw_value": data.get("value"), # your custom value (e.g. idle duration)
-        "is_lecturer": bool(data.get("is_lecturer")),
+        "raw_type": raw_type,
+        "raw_value": data.get("value"),
+        "is_lecturer": is_lecturer,
     }
 
-    conn = connect(); cur = conn.cursor()
+    conn = connect()
+    cur = conn.cursor()
 
+    # --- Session handling (✅ tie session to THIS course/class only) ---
     session_id = data.get("session_id")
     try:
         session_id = int(session_id) if session_id is not None else None
     except Exception:
         session_id = None
 
-    if session_id:
-        r = cur.execute(
-            "SELECT id FROM sessions WHERE id=?", (session_id,)
+    if session_id is not None:
+        srow = cur.execute(
+            "SELECT id, class_id FROM sessions WHERE id=?",
+            (session_id,),
         ).fetchone()
-        if not r:
-            session_id = None
-    if not session_id:
-        session_id = get_open_session_id(conn)
-        if not session_id:
+
+        if not srow:
+            conn.close()
+            return jsonify({"ok": False, "error": "invalid_session_id"}), 400
+
+         # Must match this class
+        db_class_id = srow["class_id"]  # DictRow safe
+        if (db_class_id or "") != course_id:
+            conn.close()
+            return jsonify({"ok": False, "error": "session_course_mismatch"}), 400
+    else:
+        # Find latest open session for THIS course/class
+        srow = cur.execute(
+            "SELECT id FROM sessions WHERE end_ts IS NULL AND class_id=? "
+            "ORDER BY start_ts DESC LIMIT 1",
+            (course_id,),
+        ).fetchone()
+
+        if srow:
+            session_id = srow["id"]
+        else:
+            # Create new session bound to this course/class
             cur.execute(
-                "INSERT INTO sessions(name, start_ts) VALUES(?,?)",
-                ("Auto Session", now_iso()),
+                "INSERT INTO sessions(name, start_ts, class_id) VALUES(?,?,?)",
+                ("Auto Session", now_iso(), course_id),
             )
             session_id = cur.lastrowid
 
-    try:
-        cur.execute(
-            "UPDATE students SET last_seen_ts=? WHERE id=?",
-            (ts_iso, student_id),
-        )
-    except Exception:
-        pass
+    # --- Enrollment guard (✅ only students enrolled in this class can send events) ---
+    if not is_lecturer:
+        enrolled = cur.execute(
+            "SELECT 1 FROM enrollments WHERE class_id=? AND student_id=? LIMIT 1",
+            (course_id, student_id),
+        ).fetchone()
+
+        if not enrolled:
+            conn.close()
+            return jsonify({"ok": False, "error": "student_not_enrolled"}), 403
+
+    # Update last seen for real students only
+    if not is_lecturer:
+        try:
+            cur.execute(
+                "UPDATE students SET last_seen_ts=? WHERE id=?",
+                (ts_iso, student_id),
+            )
+        except Exception:
+            pass
 
     exec_retry(
         cur,
@@ -4535,12 +4570,15 @@ def create_event():
     )
     event_id = cur.lastrowid
 
-    try:
-        mark_attendance_if_needed(conn, session_id, student_id, ts_iso)
-    except Exception as e:
-        print("[attendance] mark failed:", e, file=sys.stderr)
+    # Attendance marking only for students (not lecturer events)
+    if not is_lecturer:
+        try:
+            mark_attendance_if_needed(conn, session_id, student_id, ts_iso)
+        except Exception as e:
+            print("[attendance] mark failed:", e, file=sys.stderr)
 
-    conn.commit(); conn.close()
+    conn.commit()
+    conn.close()
 
     out = {
         "id": event_id,
