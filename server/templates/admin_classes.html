@@ -97,15 +97,6 @@
             />
           </div>
 
-          <!-- Mode filter -->
-          <div class="filter-wrapper" data-label="Mode">
-            <select id="classFilterMode" class="classes-select">
-              <option value="all">All modes</option>
-              <option value="Online">Online</option>
-              <option value="Face to face">Face to face</option>
-            </select>
-          </div>
-
           <!-- Department filter (optional, can remove if you don’t want) -->
           <div class="filter-wrapper" data-label="Department">
             <select id="classFilterDept" class="classes-select">
@@ -172,11 +163,7 @@
 
               <div class="form-group">
                 <label for="mode">Mode</label>
-                <select id="mode" name="mode">
-                  <option value="Online">Online</option>
-                  <option value="Physical">Physical</option>
-                  <option value="Hybrid">Hybrid</option>
-                </select>
+                <input type="text" id="mode" name="mode" value="Online" readonly />
               </div>
 
               <div class="form-group">
@@ -197,16 +184,6 @@
                   id="platform_link"
                   name="platform_link"
                   placeholder="https://meet.google.com/..."
-                />
-              </div>
-
-              <div class="form-group" id="location-wrapper">
-                <label for="location">Location (Room)</label>
-                <input
-                  type="text"
-                  id="location"
-                  name="location"
-                  placeholder="e.g. DKU5, Lab B104"
                 />
               </div>
 
@@ -265,7 +242,6 @@
                   <th>Group</th>
                   <th>Lecturer</th>
                   <th>Mode</th>
-                  <th>Location</th>
                   <th>Link</th>
                   <th>Department</th>
                   <th>Day</th>
@@ -290,7 +266,6 @@
                     <td>{{ c.group_name }}</td>
                     <td>{{ c.lecturer }}</td>
                     <td>{{ c.mode }}</td>
-                    <td>{{ c.location }}</td>
                     <td>{{ c.link }}</td>
                     <td>{{ c.dept_name }}</td>
                     <td>
