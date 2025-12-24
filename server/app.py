@@ -3423,19 +3423,30 @@ def api_summary_hero(class_id):
     ).fetchone()
     total_students = int(row["cnt"] or 0)
 
-    # 3) Average engagement for this class (all sessions)
-    row = cur.execute(
+    # 3) Average engagement for this class
+    #✅ Average of each student's average (missing student = 0)
+    rows = cur.execute(
         """
-        SELECT AVG(engagement_score) AS avg_score
-        FROM engagement_summary
-        WHERE class_id = ?
+        SELECT
+          e.student_id,
+          COALESCE(AVG(es.engagement_score), 0) AS student_avg_eng
+        FROM enrollments e
+        LEFT JOIN engagement_summary es
+          ON es.class_id = e.class_id
+         AND es.student_id = e.student_id
+        WHERE e.class_id = ?
+        GROUP BY e.student_id
         """,
         (class_id,),
-    ).fetchone()
-    avg_eng = float(row["avg_score"] or 0.0)
-    avg_eng_rounded = int(round(avg_eng))
+    ).fetchall()
+
+    if rows:
+        avg_eng_rounded = int(round(sum(float(r["student_avg_eng"] or 0) for r in rows) / len(rows)))
+    else:
+        avg_eng_rounded = 0
 
     # 4) Current session attendance (latest open session for this class)
+    #    ✅ Use total_students as denominator (missing attendance row = absent)
     row = cur.execute(
         """
         SELECT id
@@ -3449,48 +3460,68 @@ def api_summary_hero(class_id):
     ).fetchone()
 
     current_attendance = None
-    if row:
+    if row and total_students > 0:
         current_session_id = row["id"]
+
         row_att = cur.execute(
             """
             SELECT
-              SUM(CASE WHEN status = 'present' THEN 1 ELSE 0 END) AS present_cnt,
-              COUNT(*) AS total_cnt
-            FROM attendance
-            WHERE session_id = ?
+              SUM(CASE WHEN a.status IN ('present','late') THEN 1 ELSE 0 END) AS present_cnt
+            FROM enrollments e
+            LEFT JOIN attendance a
+              ON a.session_id = ?
+             AND a.student_id = e.student_id
+            WHERE e.class_id = ?
             """,
-            (current_session_id,),
+            (current_session_id, class_id),
         ).fetchone()
 
-        total_cnt = row_att["total_cnt"] or 0
-        if total_cnt > 0:
-            current_attendance = int(
-                round(100.0 * (row_att["present_cnt"] or 0) / total_cnt)
-            )
+        present_cnt = int(row_att["present_cnt"] or 0)
+        current_attendance = int(round(100.0 * present_cnt / total_students))
 
     # 5) 14-week attendance window for this class
+    #    ✅ Average of each student's attendance rate within last 14 weeks (missing = 0)
     now = datetime.now(timezone.utc)
     cutoff_14w = now - timedelta(weeks=14)
 
-    row_14 = cur.execute(
+    row_total_14 = cur.execute(
         """
-        SELECT
-          SUM(CASE WHEN a.status = 'present' THEN 1 ELSE 0 END) AS present_cnt,
-          COUNT(*) AS total_cnt
-        FROM attendance a
-        JOIN sessions s ON a.session_id = s.id
-        WHERE s.class_id = ?
-          AND s.start_ts >= ?
+        SELECT COUNT(*) AS cnt
+        FROM sessions
+        WHERE class_id = ?
+          AND start_ts >= ?
         """,
         (class_id, cutoff_14w.isoformat()),
     ).fetchone()
 
+    total_sessions_14 = int(row_total_14["cnt"] or 0)
+
     attendance_14w = None
-    total_cnt_14 = row_14["total_cnt"] or 0
-    if total_cnt_14 > 0:
-        attendance_14w = int(
-            round(100.0 * (row_14["present_cnt"] or 0) / total_cnt_14)
-        )
+    if total_students > 0 and total_sessions_14 > 0:
+        rows_att_14 = cur.execute(
+            """
+            SELECT
+              e.student_id,
+              COALESCE(SUM(CASE WHEN a.status IN ('present','late') THEN 1 ELSE 0 END), 0) AS present_cnt
+            FROM enrollments e
+            LEFT JOIN attendance a
+              ON a.student_id = e.student_id
+            LEFT JOIN sessions s
+              ON s.id = a.session_id
+             AND s.class_id = ?
+             AND s.start_ts >= ?
+            WHERE e.class_id = ?
+            GROUP BY e.student_id
+            """,
+            (class_id, cutoff_14w.isoformat(), class_id),
+        ).fetchall()
+
+        # per student: present_cnt / total_sessions_14
+        per_student_rates = [
+            100.0 * (int(r["present_cnt"] or 0)) / total_sessions_14
+            for r in rows_att_14
+        ]
+        attendance_14w = int(round(sum(per_student_rates) / len(per_student_rates)))
 
     conn.close()
 
