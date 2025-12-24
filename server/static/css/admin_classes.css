@@ -571,3 +571,27 @@ select:focus {
   transform: translateY(1px);
 }
 
+/* =========================================================
+   NEW: Readonly Mode input + small caption
+   ========================================================= */
+
+.readonly-input[readonly] {
+  background: #f3f4f6;        /* light grey */
+  color: #334155;             /* muted text */
+  border-color: #e5e7eb;
+  cursor: not-allowed;
+}
+
+.readonly-input[readonly]:focus {
+  outline: none;
+  box-shadow: none;
+  border-color: #e5e7eb;
+}
+
+.field-hint {
+  display: block;
+  margin-top: 6px;
+  font-size: 12px;
+  color: #6b7280;             /* muted grey */
+  line-height: 1.2;
+}
