@@ -195,18 +195,17 @@ document.addEventListener("DOMContentLoaded", () => {
     }
     upcomingMeta.textContent = `${mainTime} · ${mainLocMode}`;
 
-    // ----- Also today (render same UI style as main card) -----
+    // ----- Also today (same design as main, no box) -----
     if (extraList && others.length > 0) {
       others.forEach((cls) => {
-        const card = document.createElement("div");
-        card.className = "upcoming-extra-card";
+        const item = document.createElement("div");
+        item.className = "upcoming-extra-item";
 
         const title = document.createElement("div");
         title.className = "upcoming-title";
         title.textContent = `${cls.class_id} – ${cls.class_name || ""}`;
 
-        const time =
-          `${formatTime12h(cls.time_start)} – ${formatTime12h(cls.time_end)}`;
+        const time = `${formatTime12h(cls.time_start)} – ${formatTime12h(cls.time_end)}`;
 
         let loc = "";
         if (cls.delivery_mode === "Google Meet") {
@@ -221,9 +220,9 @@ document.addEventListener("DOMContentLoaded", () => {
         meta.className = "upcoming-meta";
         meta.textContent = `${time} · ${loc}`;
 
-        card.appendChild(title);
-        card.appendChild(meta);
-        extraList.appendChild(card);
+        item.appendChild(title);
+        item.appendChild(meta);
+        extraList.appendChild(item);
       });
     }
   }

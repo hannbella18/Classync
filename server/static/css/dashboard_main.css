@@ -1398,6 +1398,19 @@ body {
   box-shadow: 0 8px 16px rgba(15, 35, 52, 0.03);
 }
 
+/* extra classes: same style as main, no box, no divider */
+.upcoming-extra-cards {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  margin-top: 14px;
+}
+
+.upcoming-extra-item {
+  padding: 0;       /* no extra spacing box */
+  border: none;     /* no divider line */
+}
+
 /* ============ RESPONSIVE ============ */
 
 @media (max-width: 1180px) {
