@@ -15,8 +15,7 @@ document.addEventListener("DOMContentLoaded", () => {
   // ===== Controls & table elements =====
   const sessionSelect = document.getElementById("sessionSelect");
   const refreshButtons = document.querySelectorAll(
-    "[data-role='summary-refresh'],[data-role='live-refresh']"
-  );
+    "[data-role='summary-refresh']");
   const csvTopBtn = document.getElementById("downloadCsvTop");
   const liveUpdatedLabel = document.getElementById("liveUpdatedLabel");
   const engagementBody = document.getElementById("engagementBody");
@@ -47,7 +46,7 @@ document.addEventListener("DOMContentLoaded", () => {
     if (!status) return "—";
     const s = String(status).toLowerCase();
     if (s === "present") return "Present";
-    if (s === "late") return "Late";
+    if (s === "late") return "Present";
     if (s === "absent") return "Absent";
     return status;
   }
@@ -454,12 +453,8 @@ document.addEventListener("DOMContentLoaded", () => {
       }
 
       if (attendanceEl) {
-        let att = data.current_session_attendance;
-        if (att == null) {
-          att = data.attendance_14w;
-        }
-        attendanceEl.textContent =
-          att == null ? "--%" : `${Math.round(att)}%`;
+        const att = data.class_avg_attendance; // ✅ only overall
+        attendanceEl.textContent = att == null ? "--%" : `${Math.round(att)}%`;
       }
     } catch (err) {
       console.error("[summary] Failed to load hero stats:", err);
@@ -495,7 +490,7 @@ document.addEventListener("DOMContentLoaded", () => {
 
       const sessions = data.sessions || [];
       sessionSelect.innerHTML = "";
-      totalSessionsCount = sessions.length; // ✅ we’ll use this for avg attendance calc
+      totalSessionsCount = data.total_planned_sessions ?? sessions.length; // ✅ we’ll use this for avg attendance calc
 
       if (sessions.length === 0) {
         const opt = document.createElement("option");

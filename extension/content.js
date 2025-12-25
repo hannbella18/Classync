@@ -17,6 +17,8 @@ const DROWSY_ALERT_THRESHOLD = 0.70;     // confidence required to alert
 // Persist join-click intent across Meet SPA navigation
 const AUTOSTART_KEY = "classync_autostart_ts";
 
+// send verified only once per session (per student)
+const VERIFIED_SENT = new Set();
 // ================= STATE =================
 let captureTimer = null;
 let videoSource = null;
@@ -588,6 +590,22 @@ async function handleFrameBlob(blob) {
         console.log("[Classync] identified:", IDENT);
         setNameIdLabel(IDENT.name || IDENT.id || "Unknown");
         logOverlayLine(`Identified as ${IDENT.name || IDENT.id || "Unknown"}.`);
+
+        // ✅ Mark attendance ONLY when verification succeeds (face matched)
+        const sidNow = CURRENT_SESSION_ID || (await ensureSessionId());
+        const key = `${sidNow}:${IDENT.id}`;
+
+        if (sidNow && IDENT.id && !VERIFIED_SENT.has(key)) {
+          VERIFIED_SENT.add(key);
+
+          // This triggers backend attendance marking + late logic
+          await sendEngagementEvent("verified", {
+            method: "face_match",
+            confidence: resp.score ?? null,
+          });
+
+          logOverlayLine("Verified → attendance marked.");
+        }
       } else {
         console.log("[Classync] identify: no match yet", resp);
         logOverlayLine("No face match yet.");

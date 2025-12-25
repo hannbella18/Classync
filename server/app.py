@@ -2578,24 +2578,57 @@ def format_session_label(row):
     return f"Session {row['id']} – {pretty}"
 
 # -------------------- Classes & Attendance Helpers --------------------
-def mark_attendance_if_needed(conn, session_id, student_id, ts_iso):
+LATE_AFTER_MINUTES = 30
+
+def parse_iso(iso_str: str) -> datetime:
+    # works with "2025-12-21T13:18:13+00:00" and "Z"
+    s = (iso_str or "").replace("Z", "+00:00")
+    return datetime.fromisoformat(s)
+
+def mark_attendance_if_needed(session_id, student_id, ts_iso):
+    conn = connect()
     cur = conn.cursor()
-    r = cur.execute(
-        "SELECT id, status, first_seen_ts, last_seen_ts "
-        "FROM attendance WHERE session_id=? AND student_id=?",
+
+    # already has attendance? don’t overwrite (lecturer override should stay)
+    existing = cur.execute(
+        "SELECT id, status FROM attendance WHERE session_id=? AND student_id=?",
         (session_id, student_id),
     ).fetchone()
-    if not r:
-        cur.execute(
-            "INSERT INTO attendance(session_id, student_id, status, first_seen_ts, last_seen_ts) "
-            "VALUES(?,?,?,?,?)",
-            (session_id, student_id, "present", ts_iso, ts_iso),
-        )
-    else:
-        cur.execute(
-            "UPDATE attendance SET last_seen_ts=? WHERE id=?",
-            (ts_iso, r["id"]),
-        )
+
+    if existing:
+        conn.close()
+        return
+
+    # get session start time
+    sess = cur.execute(
+        "SELECT start_ts FROM sessions WHERE id=?",
+        (session_id,),
+    ).fetchone()
+
+    # fallback: if no start_ts, mark present
+    status = "present"
+
+    try:
+        if sess and sess["start_ts"]:
+            start_dt = parse_iso(sess["start_ts"])
+            verify_dt = parse_iso(ts_iso)
+
+            late_cutoff = start_dt + timedelta(minutes=LATE_AFTER_MINUTES)
+            if verify_dt > late_cutoff:
+                status = "late"
+    except Exception:
+        status = "present"
+
+    cur.execute(
+        """
+        INSERT INTO attendance(session_id, student_id, status, first_seen_ts)
+        VALUES (?, ?, ?, ?)
+        """,
+        (session_id, student_id, status, ts_iso),
+    )
+
+    conn.commit()
+    conn.close()
 
 def get_open_session_id(conn):
     cur = conn.cursor()
@@ -3445,39 +3478,35 @@ def api_summary_hero(class_id):
     else:
         avg_eng_rounded = 0
 
-    # 4) Current session attendance (latest open session for this class)
-    #    ✅ Use total_students as denominator (missing attendance row = absent)
-    row = cur.execute(
-        """
-        SELECT id
-        FROM sessions
-        WHERE class_id = ?
-          AND end_ts IS NULL
-        ORDER BY start_ts DESC
-        LIMIT 1
-        """,
+    # 4) Overall attendance for this class (stable hero value)
+    #    ✅ present/late counts as attended
+    #    ✅ denominator = total_sessions * total_students
+    row_ts = cur.execute(
+        "SELECT COUNT(*) AS cnt FROM sessions WHERE class_id = ?",
         (class_id,),
     ).fetchone()
+    total_sessions_all = int(row_ts["cnt"] or 0)
 
     current_attendance = None
-    if row and total_students > 0:
-        current_session_id = row["id"]
-
-        row_att = cur.execute(
+    if total_students > 0 and total_sessions_all > 0:
+        row_overall = cur.execute(
             """
             SELECT
-              SUM(CASE WHEN a.status IN ('present','late') THEN 1 ELSE 0 END) AS present_cnt
+              COALESCE(SUM(CASE WHEN a.status IN ('present','late') THEN 1 ELSE 0 END), 0) AS present_cnt
             FROM enrollments e
+            JOIN sessions s
+              ON s.class_id = e.class_id
             LEFT JOIN attendance a
-              ON a.session_id = ?
+              ON a.session_id = s.id
              AND a.student_id = e.student_id
             WHERE e.class_id = ?
             """,
-            (current_session_id, class_id),
+            (class_id,),
         ).fetchone()
 
-        present_cnt = int(row_att["present_cnt"] or 0)
-        current_attendance = int(round(100.0 * present_cnt / total_students))
+        present_cnt = int(row_overall["present_cnt"] or 0)
+        denom = total_students * total_sessions_all
+        current_attendance = int(round(100.0 * present_cnt / denom))
 
     # 5) 14-week attendance window for this class
     #    ✅ Average of each student's attendance rate within last 14 weeks (missing = 0)
@@ -3501,15 +3530,15 @@ def api_summary_hero(class_id):
         rows_att_14 = cur.execute(
             """
             SELECT
-              e.student_id,
-              COALESCE(SUM(CASE WHEN a.status IN ('present','late') THEN 1 ELSE 0 END), 0) AS present_cnt
+                e.student_id,
+                COALESCE(SUM(CASE WHEN a.status IN ('present','late') THEN 1 ELSE 0 END), 0) AS present_cnt
             FROM enrollments e
-            LEFT JOIN attendance a
-              ON a.student_id = e.student_id
-            LEFT JOIN sessions s
-              ON s.id = a.session_id
-             AND s.class_id = ?
+            JOIN sessions s
+              ON s.class_id = e.class_id
              AND s.start_ts >= ?
+            LEFT JOIN attendance a
+              ON a.session_id = s.id
+             AND a.student_id = e.student_id
             WHERE e.class_id = ?
             GROUP BY e.student_id
             """,
@@ -4148,21 +4177,16 @@ def api_delete_enrollment(class_id, student_id):
 # -------------------- API: Auto session_from_meet --------------------
 @app.post("/api/auto/session_from_meet")
 def api_auto_session_from_meet():
-    """
-    The extension calls this once per Meet tab to get/create a session.
-    Payload (from extension):
-      { "course_id": "CSC4400", "meet_url": "...", "title": "..." }
-    """
     data = request.get_json(force=True, silent=True) or {}
 
-    # Treat course_id as our class_id
     class_id = (data.get("course_id") or "CS101").strip()
     meet_url = (data.get("meet_url") or "").strip()
     title    = (data.get("title") or "").strip() or f"Meet - {class_id}"
+    is_lecturer = bool(data.get("is_lecturer"))  # ✅ NEW
 
     conn = connect(); cur = conn.cursor()
 
-    # Try to reuse an open session for the same class + meet link
+    # Try to reuse an open session for same class + meet link
     row = cur.execute(
         """
         SELECT id
@@ -4176,20 +4200,31 @@ def api_auto_session_from_meet():
 
     if row:
         session_id = row["id"]
-    else:
-        # Store class_id + meet_url so later we can aggregate correctly
-        cur.execute(
-            """
-            INSERT INTO sessions(name, start_ts, class_id, platform_link)
-            VALUES (?,?,?,?)
-            """,
-            (title, now_iso(), class_id, meet_url),
-        )
-        session_id = cur.lastrowid
+        conn.close()
+        return jsonify({"ok": True, "session_id": session_id})
+
+    # ✅ No open session exists
+    if not is_lecturer:
+        # Student is not allowed to create a session
+        conn.close()
+        return jsonify({
+            "ok": True,
+            "session_id": None,
+            "waiting_for_lecturer": True
+        })
+
+    # ✅ Lecturer creates new session (this start_ts becomes your "class start")
+    cur.execute(
+        """
+        INSERT INTO sessions(name, start_ts, class_id, platform_link)
+        VALUES (?,?,?,?)
+        """,
+        (title, now_iso(), class_id, meet_url),
+    )
+    session_id = cur.lastrowid
 
     conn.commit()
     conn.close()
-
     return jsonify({"ok": True, "session_id": session_id})
 
 # -------------------- API: Stop session --------------------
@@ -4604,7 +4639,10 @@ def create_event():
     # Attendance marking only for students (not lecturer events)
     if not is_lecturer:
         try:
-            mark_attendance_if_needed(conn, session_id, student_id, ts_iso)
+            # Mark attendance ONLY when verification succeeds (face matched)
+            # Expect frontend to send: type="verified"
+            if etype == "verified":
+                mark_attendance_if_needed(session_id, student_id, ts_iso)
         except Exception as e:
             print("[attendance] mark failed:", e, file=sys.stderr)
 
