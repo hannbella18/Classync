@@ -46,7 +46,7 @@ document.addEventListener("DOMContentLoaded", () => {
     if (!status) return "—";
     const s = String(status).toLowerCase();
     if (s === "present") return "Present";
-    if (s === "late") return "Present";
+    if (s === "late") return "Late";
     if (s === "absent") return "Absent";
     return status;
   }
@@ -235,6 +235,7 @@ document.addEventListener("DOMContentLoaded", () => {
 
       const statuses = [
         { key: "present", label: "Present" },
+        { key: "late", label: "Late" },
         { key: "absent", label: "Absent" },
       ];
 
@@ -453,7 +454,12 @@ document.addEventListener("DOMContentLoaded", () => {
       }
 
       if (attendanceEl) {
-        const att = data.class_avg_attendance; // ✅ only overall
+        // ✅ use what backend provides
+        const att =
+          data.current_session_attendance ??
+          data.attendance_14w ??
+          null;
+
         attendanceEl.textContent = att == null ? "--%" : `${Math.round(att)}%`;
       }
     } catch (err) {

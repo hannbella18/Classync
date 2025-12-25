@@ -20,7 +20,12 @@
       "css": ["overlay.css"],
       "run_at": "document_idle"
     },
-
+    {
+      "matches": ["https://hannbella-classync.hf.space/join/*"],
+      "js": ["config.js", "content.js"],
+      "css": ["overlay.css"],
+      "run_at": "document_idle"
+    },
     {
       "matches": ["http://localhost:5001/*"],
       "js": ["status_ping_content.js"],

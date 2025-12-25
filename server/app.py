@@ -697,7 +697,7 @@ def compute_engagement_for_session(session_id):
                     last_att = cur.execute(
                         """
                         SELECT
-                        SUM(CASE WHEN status='present' THEN 1 ELSE 0 END) AS present_cnt,
+                        SUM(CASE WHEN status IN ('present','late') THEN 1 ELSE 0 END) AS present_cnt
                         COUNT(*) AS total_cnt
                         FROM attendance
                         WHERE session_id = ?
@@ -2578,7 +2578,7 @@ def format_session_label(row):
     return f"Session {row['id']} – {pretty}"
 
 # -------------------- Classes & Attendance Helpers --------------------
-LATE_AFTER_MINUTES = 30
+LATE_AFTER_MINUTES = 1
 
 def parse_iso(iso_str: str) -> datetime:
     # works with "2025-12-21T13:18:13+00:00" and "Z"
@@ -3542,7 +3542,7 @@ def api_summary_hero(class_id):
             WHERE e.class_id = ?
             GROUP BY e.student_id
             """,
-            (class_id, cutoff_14w.isoformat(), class_id),
+            (cutoff_14w.isoformat(), class_id),
         ).fetchall()
 
         # per student: present_cnt / total_sessions_14
@@ -4044,7 +4044,7 @@ def api_attendance_override(class_id, session_id):
     if status == "late":
         status = "present"
 
-    if status not in ("present", "absent"):
+    if status not in ("present", "late", "absent"):
         return jsonify({"ok": False, "error": "invalid_status"}), 400
 
     conn = connect()

@@ -17,8 +17,12 @@ const DROWSY_ALERT_THRESHOLD = 0.70;     // confidence required to alert
 // Persist join-click intent across Meet SPA navigation
 const AUTOSTART_KEY = "classync_autostart_ts";
 
-// send verified only once per session (per student)
+// Persist course id across pages (join -> meet)
+const COURSE_KEY = "classync_course_id";
+
+// Send verified only once per session (per student)
 const VERIFIED_SENT = new Set();
+
 // ================= STATE =================
 let captureTimer = null;
 let videoSource = null;
@@ -35,6 +39,9 @@ let lastIdentifyAt = 0;
 let lastInferAt = 0;
 
 let CURRENT_SESSION_ID = null;
+
+// course_id detected (dynamic)
+let CURRENT_COURSE_ID = null;
 
 // overlay state
 let idleSeconds = 0;
@@ -69,6 +76,97 @@ function consumeAutoStartIntent(maxAgeMs = 15_000) {
   } catch (e) {
     return false;
   }
+}
+
+function storageSetCourseId(courseId) {
+  const cid = (courseId || "").trim();
+  if (!cid) return;
+
+  CURRENT_COURSE_ID = cid;
+
+  try { localStorage.setItem(COURSE_KEY, cid); } catch (e) {}
+  try { sessionStorage.setItem(COURSE_KEY, cid); } catch (e) {}
+
+  // best: keep across domains using chrome.storage
+  try {
+    if (chrome?.storage?.local) {
+      chrome.storage.local.set({ [COURSE_KEY]: cid });
+    }
+  } catch (e) {}
+}
+
+function parseCourseIdFromJoinUrl(urlStr) {
+  try {
+    const u = new URL(urlStr);
+    // example: http://hannbella-classync.hf.space/join/CSC4400
+    const parts = (u.pathname || "").split("/").filter(Boolean);
+    const joinIdx = parts.indexOf("join");
+    if (joinIdx !== -1 && parts[joinIdx + 1]) {
+      return decodeURIComponent(parts[joinIdx + 1]).trim();
+    }
+  } catch (e) {}
+  return null;
+}
+
+function getCourseIdFromStoragesSync() {
+  // try local/session first (same domain only)
+  try {
+    const a = sessionStorage.getItem(COURSE_KEY);
+    if (a) return a.trim();
+  } catch (e) {}
+  try {
+    const b = localStorage.getItem(COURSE_KEY);
+    if (b) return b.trim();
+  } catch (e) {}
+  return null;
+}
+
+function getCourseIdFromChromeStorage() {
+  return new Promise((resolve) => {
+    try {
+      if (!chrome?.storage?.local) return resolve(null);
+      chrome.storage.local.get([COURSE_KEY], (res) => {
+        const v = res?.[COURSE_KEY];
+        resolve(v ? String(v).trim() : null);
+      });
+    } catch (e) {
+      resolve(null);
+    }
+  });
+}
+
+async function ensureCourseId() {
+  if (CURRENT_COURSE_ID) return CURRENT_COURSE_ID;
+
+  // 1) if extension is running on join page, parse it and store it
+  const fromJoin = parseCourseIdFromJoinUrl(location.href);
+  if (fromJoin) {
+    storageSetCourseId(fromJoin);
+    return fromJoin;
+  }
+
+  // 2) try session/local (domain-scoped)
+  const fromLocal = getCourseIdFromStoragesSync();
+  if (fromLocal) {
+    CURRENT_COURSE_ID = fromLocal;
+    return fromLocal;
+  }
+
+  // 3) try chrome.storage.local (cross-domain)
+  const fromChrome = await getCourseIdFromChromeStorage();
+  if (fromChrome) {
+    CURRENT_COURSE_ID = fromChrome;
+    return fromChrome;
+  }
+
+  // 4) last resort: ask once
+  const guessed = window.prompt("Enter class code (e.g. CSC4400):", "");
+  if (guessed && guessed.trim()) {
+    storageSetCourseId(guessed.trim());
+    return guessed.trim();
+  }
+
+  return null;
 }
 
 // For JSON APIs: /api/auto/session_from_meet, /stop, /api/events, etc.
@@ -321,7 +419,6 @@ function playStudentAlert() {
     const AudioCtx = window.AudioContext || window.webkitAudioContext;
     if (!AudioCtx) return;
 
-    // Reuse the shared audio context (more reliable + lighter)
     const ctxA = sharedAudioCtx || new AudioCtx();
     sharedAudioCtx = ctxA;
 
@@ -366,8 +463,14 @@ function maybeAlertStudent(state, score) {
 async function ensureSessionId() {
   if (CURRENT_SESSION_ID !== null) return CURRENT_SESSION_ID;
 
+  const courseId = await ensureCourseId();
+  if (!courseId) {
+    logOverlayLine("Error: no class code. Cannot create session.");
+    return null;
+  }
+
   const resp = await apiJson("/api/auto/session_from_meet", "POST", {
-    course_id: "CSC4400",
+    course_id: courseId,         // ✅ dynamic now
     meet_url: location.href,
     title: document.title || "",
   });
@@ -387,11 +490,12 @@ async function ensureSessionId() {
 async function sendEngagementEvent(eventType, valueObj) {
   if (!started) return;
 
+  const courseId = await ensureCourseId();
   const sid = await ensureSessionId();
-  if (!sid) return;
+  if (!sid || !courseId) return;
 
   await apiJson("/api/events", "POST", {
-    course_id: "CSC4400",
+    course_id: courseId,         // ✅ dynamic now
     camera_id: "MEET_TAB",
     student_id: IDENT.id || null,
     name: IDENT.name || IDENT.id || "Unknown",
@@ -517,6 +621,9 @@ function stopCapture() {
 
   started = false;
 
+  // ✅ reset verified tracking safely (cannot reassign const)
+  VERIFIED_SENT.clear();
+
   if (captureTimer) { clearInterval(captureTimer); captureTimer = null; }
   if (idleTimer) { clearInterval(idleTimer); idleTimer = null; }
 
@@ -581,27 +688,41 @@ async function handleFrameBlob(blob) {
     try {
       logOverlayLine("Trying face recognition…");
 
-      const sid = CURRENT_SESSION_ID ? `?session_id=${encodeURIComponent(CURRENT_SESSION_ID)}` : "";
+      const sid = CURRENT_SESSION_ID
+        ? `?session_id=${encodeURIComponent(CURRENT_SESSION_ID)}`
+        : "";
+
       const resp = await apiJpeg(`/api/identify${sid}`, blob);
 
       if (resp && resp.ok && resp.student_id && !resp.pending) {
         IDENT.id = resp.student_id;
         IDENT.name = resp.name || "";
+
         console.log("[Classync] identified:", IDENT);
         setNameIdLabel(IDENT.name || IDENT.id || "Unknown");
         logOverlayLine(`Identified as ${IDENT.name || IDENT.id || "Unknown"}.`);
 
-        // ✅ Mark attendance ONLY when verification succeeds (face matched)
+        // ✅ send verified ONCE per session+student
         const sidNow = CURRENT_SESSION_ID || (await ensureSessionId());
+        const courseId = await ensureCourseId();
         const key = `${sidNow}:${IDENT.id}`;
 
-        if (sidNow && IDENT.id && !VERIFIED_SENT.has(key)) {
+        if (sidNow && courseId && IDENT.id && !VERIFIED_SENT.has(key)) {
           VERIFIED_SENT.add(key);
 
-          // This triggers backend attendance marking + late logic
-          await sendEngagementEvent("verified", {
-            method: "face_match",
-            confidence: resp.score ?? null,
+          // send event type="verified" so backend can mark attendance + late logic
+          await apiJson("/api/events", "POST", {
+            course_id: courseId,
+            camera_id: "MEET_TAB",
+            student_id: IDENT.id,
+            name: IDENT.name || IDENT.id,
+            ts: Math.floor(Date.now() / 1000),
+            session_id: sidNow,
+            type: "verified",
+            value: {
+              method: "face_match",
+              confidence: resp.score ?? null,
+            },
           });
 
           logOverlayLine("Verified → attendance marked.");
@@ -665,8 +786,11 @@ async function handleFrameBlob(blob) {
         }
 
         const sid = await ensureSessionId();
+        const courseId = await ensureCourseId();
+        if (!sid || !courseId) return;
+
         await apiJson("/api/events", "POST", {
-          course_id: "CSC4400",
+          course_id: courseId,
           camera_id: "MEET_TAB",
           student_id: IDENT.id || null,
           name: IDENT.name || IDENT.id || "Unknown",
@@ -749,7 +873,7 @@ function setupAutoStartStop() {
     pendingAutoStart = true;
     markAutoStartIntent();
 
-    // 🔥 unlock audio so beeps work even with auto-start
+    // unlock audio so beeps work even with auto-start
     unlockAudioOnce();
 
     setTimeout(() => {
@@ -796,12 +920,18 @@ function setupAutoStartStop() {
 }
 
 // ================= INIT =================
-function init() {
+async function init() {
   createOverlay();
   setTabStatus(document.visibilityState === "visible" ? "here" : "away");
 
+  // Try to learn course_id early (if join page)
+  const maybeJoin = parseCourseIdFromJoinUrl(location.href);
+  if (maybeJoin) storageSetCourseId(maybeJoin);
+
   console.log("[Classync] Overlay injected.");
-  logOverlayLine("Ready. Detection will start when you join the meeting.");
+  const cid = await ensureCourseId();
+  if (cid) logOverlayLine(`Ready. Class: ${cid}. Detection will start when you join the meeting.`);
+  else logOverlayLine("Ready. Detection will start when you join the meeting.");
 
   setupAutoStartStop();
 
