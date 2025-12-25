@@ -4195,17 +4195,17 @@ def api_auto_session_from_meet():
 
     class_id = (data.get("course_id") or "CS101").strip()
     meet_url = (data.get("meet_url") or "").strip()
-    title    = (data.get("title") or "").strip() or f"Meet - {class_id}"
-    is_lecturer = bool(data.get("is_lecturer"))  # ✅ NEW
+    title = (data.get("title") or "").strip() or f"Meet - {class_id}"
 
-    conn = connect(); cur = conn.cursor()
+    conn = connect()
+    cur = conn.cursor()
 
-    # Try to reuse an open session for same class + meet link
+    # ✅ Postgres uses %s placeholders (NOT ?)
     row = cur.execute(
         """
         SELECT id
         FROM sessions
-        WHERE class_id=? AND platform_link=? AND end_ts IS NULL
+        WHERE class_id=%s AND platform_link=%s AND end_ts IS NULL
         ORDER BY start_ts DESC
         LIMIT 1
         """,
@@ -4217,25 +4217,18 @@ def api_auto_session_from_meet():
         conn.close()
         return jsonify({"ok": True, "session_id": session_id})
 
-    # ✅ No open session exists
-    if not is_lecturer:
-        # Student is not allowed to create a session
-        conn.close()
-        return jsonify({
-            "ok": True,
-            "session_id": None,
-            "waiting_for_lecturer": True
-        })
-
-    # ✅ Lecturer creates new session (this start_ts becomes your "class start")
-    cur.execute(
+    # ✅ Allow students to create session too
+    # ✅ Postgres: get inserted id via RETURNING
+    row2 = cur.execute(
         """
         INSERT INTO sessions(name, start_ts, class_id, platform_link)
-        VALUES (?,?,?,?)
+        VALUES (%s, %s, %s, %s)
+        RETURNING id
         """,
         (title, now_iso(), class_id, meet_url),
-    )
-    session_id = cur.lastrowid
+    ).fetchone()
+
+    session_id = row2["id"]
 
     conn.commit()
     conn.close()
@@ -4536,23 +4529,22 @@ def create_event():
     ts_epoch     = float(data.get("ts", _time.time()))
     ts_iso       = datetime.fromtimestamp(ts_epoch, tz=timezone.utc).isoformat()
 
-    # Ignore unknown face labels (kept your original behavior)
+    # Ignore unknown face labels
     if not student_id and (
         display_name.upper() == "UNKNOWN"
         or display_name.lower().startswith("unknown")
     ):
         return jsonify({"ok": True, "ignored": "unknown"}), 200
 
-    # ✅ HARD RULE:
-    # - Student events MUST include student_id (no auto-create from name)
-    # - Lecturer events may omit student_id
+    # Student events MUST include student_id
     if not is_lecturer and not student_id:
         return jsonify({"ok": False, "error": "student_id_required"}), 400
 
+    # Lecturer can omit student_id
     if is_lecturer and not student_id:
         student_id = "LECTURER"
 
-    # Decide the event type stored in events.type
+    # Decide events.type
     raw_type = (data.get("type") or "").strip().lower()
     if raw_type:
         etype = raw_type
@@ -4567,10 +4559,10 @@ def create_event():
         "state_score": state_score,
         "camera_id": data.get("camera_id"),
         "bbox": {
-            "x": int(bbox.get("x", 0)),
-            "y": int(bbox.get("y", 0)),
-            "w": int(bbox.get("w", 0)),
-            "h": int(bbox.get("h", 0)),
+            "x": int((bbox or {}).get("x", 0)),
+            "y": int((bbox or {}).get("y", 0)),
+            "w": int((bbox or {}).get("w", 0)),
+            "h": int((bbox or {}).get("h", 0)),
         },
         "name": display_name,
         "raw_type": raw_type,
@@ -4581,7 +4573,7 @@ def create_event():
     conn = connect()
     cur = conn.cursor()
 
-    # --- Session handling (✅ tie session to THIS course/class only) ---
+    # --- Session handling ---
     session_id = data.get("session_id")
     try:
         session_id = int(session_id) if session_id is not None else None
@@ -4598,13 +4590,13 @@ def create_event():
             conn.close()
             return jsonify({"ok": False, "error": "invalid_session_id"}), 400
 
-         # Must match this class
-        db_class_id = srow["class_id"]  # DictRow safe
+        db_class_id = srow["class_id"]
         if (db_class_id or "") != course_id:
             conn.close()
             return jsonify({"ok": False, "error": "session_course_mismatch"}), 400
+
     else:
-        # Find latest open session for THIS course/class
+        # Find latest open session for THIS class
         srow = cur.execute(
             "SELECT id FROM sessions WHERE end_ts IS NULL AND class_id=? "
             "ORDER BY start_ts DESC LIMIT 1",
@@ -4614,14 +4606,14 @@ def create_event():
         if srow:
             session_id = srow["id"]
         else:
-            # Create new session bound to this course/class
+            # Create one if not found (safe fallback)
             cur.execute(
                 "INSERT INTO sessions(name, start_ts, class_id) VALUES(?,?,?)",
                 ("Auto Session", now_iso(), course_id),
             )
             session_id = cur.lastrowid
 
-    # --- Enrollment guard (✅ only students enrolled in this class can send events) ---
+    # --- Enrollment guard ---
     if not is_lecturer:
         enrolled = cur.execute(
             "SELECT 1 FROM enrollments WHERE class_id=? AND student_id=? LIMIT 1",
@@ -4632,7 +4624,7 @@ def create_event():
             conn.close()
             return jsonify({"ok": False, "error": "student_not_enrolled"}), 403
 
-    # Update last seen for real students only
+    # Update last_seen for real students
     if not is_lecturer:
         try:
             cur.execute(
@@ -4650,11 +4642,9 @@ def create_event():
     )
     event_id = cur.lastrowid
 
-    # Attendance marking only for students (not lecturer events)
+    # Attendance marking only for students + only when verified
     if not is_lecturer:
         try:
-            # Mark attendance ONLY when verification succeeds (face matched)
-            # Expect frontend to send: type="verified"
             if etype == "verified":
                 mark_attendance_if_needed(session_id, student_id, ts_iso)
         except Exception as e:
