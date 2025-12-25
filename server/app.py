@@ -3396,35 +3396,39 @@ def api_student_profile():
         })
 
     # Check 2: Check Master Table
-    row_stu = cur.execute("SELECT name FROM students WHERE id=?", (student_id,)).fetchone()
-    
-    # ✅ NEW: try get latest known email for this student from enrollments (any class)
-    row_last_email = cur.execute(
-        "SELECT email FROM enrollments WHERE student_id=? AND email IS NOT NULL AND TRIM(email)<>'' "
-        "ORDER BY id DESC LIMIT 1",
+    row_stu = cur.execute(
+        "SELECT name FROM students WHERE id=?",
         (student_id,)
     ).fetchone()
-    
-    conn.close()
 
-    last_email = row_last_email["email"] if row_last_email else ""
-    
-    # THE CRITICAL FIX: Only lock if name is NOT empty
     if row_stu and row_stu["name"] and row_stu["name"].strip():
+        # ✅ NEW: if not enrolled in this class yet, try reuse latest known email
+        row_any = cur.execute(
+            """
+            SELECT email
+            FROM enrollments
+            WHERE student_id=? AND email IS NOT NULL AND email <> ''
+            ORDER BY id DESC
+            LIMIT 1
+            """,
+            (student_id,)
+        ).fetchone()
+
+        conn.close()
         return jsonify({
-            "ok": True, 
+            "ok": True,
             "exists": True,  # LOCKED
-            "display_name": row_stu["name"], 
-            "email": ""
+            "display_name": row_stu["name"],
+            "email": (row_any["email"] if row_any else "")
         })
-    else:
-        # ID exists (Ghost user), so UNLOCK
-        return jsonify({
-            "ok": True, 
-            "exists": False, # UNLOCKED
-            "display_name": "", 
-            "email": ""
-        })
+
+    conn.close()
+    return jsonify({
+        "ok": True,
+        "exists": False,  # UNLOCKED
+        "display_name": "",
+        "email": ""
+    })
 
 # -------------------- API: Summary & Attendance--------------------
 @app.get("/api/summary/<class_id>/hero")
