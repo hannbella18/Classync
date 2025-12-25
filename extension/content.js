@@ -921,6 +921,12 @@ function setupAutoStartStop() {
 
 // ================= INIT =================
 async function init() {
+  // ✅ Guard: only run overlay + capture logic on Google Meet
+  if (!location.hostname.includes("meet.google.com")) {
+    console.log("[Classync] Not on Meet. Skipping overlay.");
+    return;
+  }
+
   createOverlay();
   setTabStatus(document.visibilityState === "visible" ? "here" : "away");
 
@@ -935,7 +941,6 @@ async function init() {
 
   setupAutoStartStop();
 
-  // If Meet navigated after join click, start on page load
   if (!started && consumeAutoStartIntent()) {
     console.log("[Classync] Auto-start intent found on init -> starting");
     setTimeout(() => { if (!started) startCapture(); }, 1200);

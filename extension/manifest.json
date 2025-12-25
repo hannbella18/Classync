@@ -22,9 +22,13 @@
     },
     {
       "matches": ["https://hannbella-classync.hf.space/join/*"],
-      "js": ["config.js", "content.js"],
-      "css": ["overlay.css"],
-      "run_at": "document_idle"
+      "js": ["join_content.js"],
+      "run_at": "document_start"
+    },
+    {
+      "matches": ["https://hannbella-classync.hf.space/"],
+      "js": ["status_ping_content.js"],
+      "run_at": "document_start"
     },
     {
       "matches": ["http://localhost:5001/*"],
