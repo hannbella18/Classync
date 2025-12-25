@@ -3397,8 +3397,18 @@ def api_student_profile():
 
     # Check 2: Check Master Table
     row_stu = cur.execute("SELECT name FROM students WHERE id=?", (student_id,)).fetchone()
+    
+    # ✅ NEW: try get latest known email for this student from enrollments (any class)
+    row_last_email = cur.execute(
+        "SELECT email FROM enrollments WHERE student_id=? AND email IS NOT NULL AND TRIM(email)<>'' "
+        "ORDER BY id DESC LIMIT 1",
+        (student_id,)
+    ).fetchone()
+    
     conn.close()
 
+    last_email = row_last_email["email"] if row_last_email else ""
+    
     # THE CRITICAL FIX: Only lock if name is NOT empty
     if row_stu and row_stu["name"] and row_stu["name"].strip():
         return jsonify({
