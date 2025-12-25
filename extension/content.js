@@ -4,13 +4,13 @@
 console.log("[Classync] content.js loaded");
 
 // ================= CONFIG =================
-const CAPTURE_INTERVAL_MS = 2000;   // how often to grab a frame
+const CAPTURE_INTERVAL_MS = 1000;   // how often to grab a frame
 const JPEG_QUALITY = 0.5;           // jpeg quality (lower = faster)
 const IDENT_EVERY_MS = 2500;        // how often to call /api/identify
-const INFER_EVERY_MS = 1500;        // how often to call /api/infer
+const INFER_EVERY_MS = 1000;        // how often to call /api/infer
+// Stop re-identifying once already identified (only re-check occasionally)
+const REIDENTIFY_EVERY_MS = 300_000; // 5 minute
 
-// Student-side drowsy alert settings
-let lastStudentAlertAt = 0;
 const DROWSY_ALERT_INTERVAL_MS = 30_000; // min 30s between beeps
 const DROWSY_ALERT_THRESHOLD = 0.70;     // confidence required to alert
 
@@ -60,6 +60,9 @@ let lastInCall = false;
 let audioUnlocked = false;
 let sharedAudioCtx = null;
 
+let identifiedAtMs = 0;
+// Student-side drowsy alert settings
+let lastStudentAlertAt = 0;
 // ================= HELPERS =================
 function markAutoStartIntent() {
   try { sessionStorage.setItem(AUTOSTART_KEY, String(Date.now())); } catch (e) {}
@@ -455,6 +458,7 @@ function maybeAlertStudent(state, score) {
   ) {
     lastStudentAlertAt = now;
     console.log("[Classync] triggering student drowsy alert", score);
+    unlockAudioOnce();
     playStudentAlert();
   }
 }
@@ -680,11 +684,11 @@ async function handleFrameBlob(blob) {
 
   const now = Date.now();
 
-  // 1) IDENTIFY
-  if (!inflightIdentify && now - lastIdentifyAt >= IDENT_EVERY_MS) {
-    inflightIdentify = true;
-    lastIdentifyAt = now;
+  // 1) IDENTIFY (only until first success, then re-check every REIDENTIFY_EVERY_MS)
+  const shouldIdentify =
+    (!IDENT.id) || (identifiedAtMs && (now - identifiedAtMs) >= REIDENTIFY_EVERY_MS);
 
+    if (shouldIdentify && !inflightIdentify && now - lastIdentifyAt >= IDENT_EVERY_MS) {
     try {
       logOverlayLine("Trying face recognition…");
 
@@ -697,6 +701,7 @@ async function handleFrameBlob(blob) {
       if (resp && resp.ok && resp.student_id && !resp.pending) {
         IDENT.id = resp.student_id;
         IDENT.name = resp.name || "";
+        identifiedAtMs = Date.now();
 
         console.log("[Classync] identified:", IDENT);
         setNameIdLabel(IDENT.name || IDENT.id || "Unknown");
@@ -929,6 +934,9 @@ async function init() {
 
   createOverlay();
   setTabStatus(document.visibilityState === "visible" ? "here" : "away");
+  // Always unlock audio on the first real user gesture in Meet
+  window.addEventListener("pointerdown", unlockAudioOnce, { once: true, capture: true });
+  window.addEventListener("keydown", unlockAudioOnce, { once: true, capture: true });
 
   // Try to learn course_id early (if join page)
   const maybeJoin = parseCourseIdFromJoinUrl(location.href);

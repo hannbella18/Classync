@@ -697,7 +697,7 @@ def compute_engagement_for_session(session_id):
                     last_att = cur.execute(
                         """
                         SELECT
-                        SUM(CASE WHEN status IN ('present','late') THEN 1 ELSE 0 END) AS present_cnt
+                        SUM(CASE WHEN status IN ('present','late') THEN 1 ELSE 0 END) AS present_cnt,
                         COUNT(*) AS total_cnt
                         FROM attendance
                         WHERE session_id = ?
