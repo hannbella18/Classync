@@ -353,412 +353,317 @@ def verify_class_token(class_id: str, token: str) -> bool:
 # Add the churn function
 def compute_engagement_for_session(session_id):
     """
-    Aggregate raw events + attendance into engagement_summary
-    for each student in a given session.
-    1 row per (session_id, student_id).
+    Aggregate raw events + attendance into engagement_summary.
+    Refined with Safety Block and Idle Penalties.
     """
     try:
         session_id = int(session_id)
     except Exception:
         return
 
-    conn = connect(); cur = conn.cursor()
+    conn = connect()
+    
+    # FIX 1: Start the Safety Block (try/finally)
+    try:
+        cur = conn.cursor()
 
-    # 1) Find the class_id for this session
-    row = cur.execute(
-        "SELECT class_id FROM sessions WHERE id=?",
-        (session_id,),
-    ).fetchone()
-    class_id = row["class_id"] if row else None
-    if not class_id:
-        # fallback label so NOT NULL constraint is satisfied
-        class_id = f"AUTO-{session_id}"
+        # 1) Find the class_id for this session
+        row = cur.execute(
+            "SELECT class_id FROM sessions WHERE id=?",
+            (session_id,),
+        ).fetchone()
+        class_id = row["class_id"] if row else None
+        
+        if not class_id:
+            class_id = f"AUTO-{session_id}"
 
-    # 1b) Find the lecturer (owner) for this class
-    row_owner = cur.execute(
-        "SELECT owner_user_id FROM classes WHERE id=?",
-        (class_id,),
-    ).fetchone()
-    lecturer_id = row_owner["owner_user_id"] if row_owner else None
+        # 1b) Find the lecturer (owner) for this class
+        row_owner = cur.execute(
+            "SELECT owner_user_id FROM classes WHERE id=?",
+            (class_id,),
+        ).fetchone()
+        lecturer_id = row_owner["owner_user_id"] if row_owner else None
 
-    # 2) Get all students with attendance for this session
-    students = cur.execute(
-        """
-        SELECT student_id, status
-        FROM attendance
-        WHERE session_id=?
-        """,
-        (session_id,),
-    ).fetchall()
-
-    if not students:
-        conn.close()
-        return
-
-    for st in students:
-        sid = st["student_id"]
-        status = (st["status"] or "").lower()
-
-        # 3) Count events by type for this student+session
-        ev_rows = cur.execute(
-            """
-            SELECT type, COUNT(*) AS cnt
-            FROM events
-            WHERE session_id=? AND student_id=?
-            GROUP BY type
-            """,
-            (session_id, sid),
+        # 2) Get all students with attendance for this session
+        students = cur.execute(
+            "SELECT student_id, status FROM attendance WHERE session_id=?",
+            (session_id,),
         ).fetchall()
 
-        drowsy_count = 0
-        awake_count = 0
-        tab_away_count = 0
+        if not students:
+            # Even if we return here, the 'finally' block below will close the connection
+            return
 
-        # counts per type (drowsy / awake / tab_away)
-        for ev in ev_rows:
-            et = (ev["type"] or "").lower()
-            if et == "drowsy":
-                drowsy_count = ev["cnt"]
-            elif et == "awake":
-                awake_count = ev["cnt"]
-            elif et == "tab_away":
-                tab_away_count = ev["cnt"]
+        for st in students:
+            sid = st["student_id"]
+            status = (st["status"] or "").lower()
 
-        # --- NEW: sum idle seconds from "idle" events ---
-        idle_seconds = 0
-        idle_rows = cur.execute(
-            "SELECT value FROM events WHERE session_id=? AND student_id=? AND type='idle'",
-            (session_id, sid),
-        ).fetchall()
-
-        for row2 in idle_rows:
-            try:
-                v = json.loads(row2["value"] or "{}")
-            except Exception:
-                continue
-
-            dur = 0
-            if isinstance(v, dict):
-                # Case 1: duration_s stored at top level (future-proof)
-                if "duration_s" in v:
-                    try:
-                        dur = int(float(v.get("duration_s", 0)))
-                    except Exception:
-                        dur = 0
-                # Case 2: duration_s stored inside raw_value (current behaviour)
-                elif isinstance(v.get("raw_value"), dict) and "duration_s" in v["raw_value"]:
-                    try:
-                        dur = int(float(v["raw_value"].get("duration_s", 0)))
-                    except Exception:
-                        dur = 0
-
-            if dur > 0:
-                idle_seconds += dur
-
-        # 4) Simple engagement score (you can refine later)
-        if status == "absent":
-            score = 0
-        else:
-            score = 100
-            score -= drowsy_count * 3
-            score -= tab_away_count * 5   # already there
-            # (optional) you can subtract a bit for idle if you want:
-            # score -= idle_seconds // 30
-            if score < 0:
-                score = 0
-
-        # 5) Map score -> risk_level
-        if score >= 70:
-            risk = "low"
-        elif score >= 40:
-            risk = "medium"
-        else:
-            risk = "high"
-
-        # 6) Upsert into engagement_summary
-        cur.execute(
-            """
-            INSERT INTO engagement_summary(
-                session_id, class_id, student_id,
-                drowsy_count, awake_count, tab_away_count,
-                idle_seconds, engagement_score, risk_level, created_at
-            )
-            VALUES (?,?,?,?,?,?,?,?,?,?)
-            ON CONFLICT(session_id, student_id)
-            DO UPDATE SET
-              drowsy_count    = excluded.drowsy_count,
-              awake_count     = excluded.awake_count,
-              tab_away_count  = excluded.tab_away_count,
-              idle_seconds    = excluded.idle_seconds,
-              engagement_score= excluded.engagement_score,
-              risk_level      = excluded.risk_level,
-              created_at      = excluded.created_at
-            """,
-            (
-                session_id,
-                class_id,
-                sid,
-                drowsy_count,
-                awake_count,
-                tab_away_count,
-                idle_seconds,            # idle_seconds (for now)
-                score,
-                risk,
-                now_iso(),
-            ),
-        )
-
-        # 7) DROWSY / ENGAGEMENT ALERT (type = drowsy_alert)
-        if lecturer_id:
-            notif_type = None
-            notif_level = None
-
-            # Rule: high risk -> red drowsy alert
-            if risk == "high":
-                notif_type = "drowsy_alert"
-                notif_level = "red"
-            # Rule: medium risk with many drowsy/tab-away -> yellow alert
-            elif risk == "medium" and (drowsy_count >= 10 or tab_away_count >= 15):
-                notif_type = "drowsy_alert"
-                notif_level = "yellow"
-
-            if notif_type:
-                msg = (
-                    f"Student {sid} is at {risk} engagement risk "
-                    f"in {class_id} (session {session_id}): "
-                    f"drowsy {drowsy_count}×, tab away {tab_away_count}×."
-                )
-
-                # avoid duplicates for same lecturer + student + session + type
-                cur.execute(
-                    """
-                    DELETE FROM notifications
-                    WHERE lecturer_id = ?
-                    AND type = ?
-                    AND message LIKE ?
-                    """,
-                    (lecturer_id, notif_type,
-                    f"Student {sid} is at %session {session_id}%"),
-                )
-
-                cur.execute(
-                    """
-                    INSERT INTO notifications(lecturer_id, message, level, type)
-                    VALUES (?,?,?,?)
-                    """,
-                    (lecturer_id, msg, notif_level, notif_type),
-                )
-
-        # 8) ATTENDANCE ALERT (type = attendance_alert)
-        if lecturer_id:
-            att_row = cur.execute(
+            # 3) Count events by type
+            ev_rows = cur.execute(
                 """
-                SELECT
-                SUM(CASE WHEN a.status='present' THEN 1 ELSE 0 END) AS present_count,
-                SUM(CASE WHEN a.status='absent'  THEN 1 ELSE 0 END) AS absent_count
-                FROM attendance a
-                JOIN sessions s ON a.session_id = s.id
-                WHERE s.class_id = ? AND a.student_id = ?
+                SELECT type, COUNT(*) AS cnt
+                FROM events
+                WHERE session_id=? AND student_id=?
+                GROUP BY type
                 """,
-                (class_id, sid),
-            ).fetchone()
+                (session_id, sid),
+            ).fetchall()
 
-            present_count = att_row["present_count"] or 0
-            absent_count  = att_row["absent_count"] or 0
-            total_sessions = present_count + absent_count
+            drowsy_count = 0
+            awake_count = 0
+            tab_away_count = 0
 
-            if total_sessions >= 3:  # only after a few sessions
-                attendance_rate = present_count * 100 / total_sessions
+            for ev in ev_rows:
+                et = (ev["type"] or "").lower()
+                if et == "drowsy":
+                    drowsy_count = ev["cnt"]
+                elif et == "awake":
+                    awake_count = ev["cnt"]
+                elif et == "tab_away":
+                    tab_away_count = ev["cnt"]
 
-                notif_type2 = None
-                notif_level2 = None
+            # --- Sum idle seconds ---
+            idle_seconds = 0
+            idle_rows = cur.execute(
+                "SELECT value FROM events WHERE session_id=? AND student_id=? AND type='idle'",
+                (session_id, sid),
+            ).fetchall()
 
-                # Example rule: < 80% = yellow, < 60% = red
-                if attendance_rate < 60:
-                    notif_type2 = "attendance_alert"
-                    notif_level2 = "red"
-                elif attendance_rate < 80:
-                    notif_type2 = "attendance_alert"
-                    notif_level2 = "yellow"
+            for row2 in idle_rows:
+                try:
+                    v = json.loads(row2["value"] or "{}")
+                except Exception:
+                    continue
 
-                if notif_type2:
-                    msg2 = (
-                        f"Student {sid} has low attendance in {class_id}: "
-                        f"{attendance_rate:.0f}% over {total_sessions} sessions."
+                dur = 0
+                if isinstance(v, dict):
+                    if "duration_s" in v:
+                        try:
+                            dur = int(float(v.get("duration_s", 0)))
+                        except: dur = 0
+                    elif isinstance(v.get("raw_value"), dict) and "duration_s" in v["raw_value"]:
+                        try:
+                            dur = int(float(v["raw_value"].get("duration_s", 0)))
+                        except: dur = 0
+                
+                if dur > 0:
+                    idle_seconds += dur
+
+            # 4) Calculate Engagement Score
+            if status == "absent":
+                score = 0
+            elif status == "late":
+                score = 50 # Late students start at 50% max
+            else:
+                score = 100 # Present students start at 100%
+
+            # Only deduct points if they are NOT absent
+            if score > 0:
+                score -= drowsy_count * 2
+                score -= tab_away_count * 2
+                
+                # FIX 2: Enable Idle Penalty
+                # Lose 1 point for every 60 seconds (5 minute) of idleness
+                if idle_seconds > 0:
+                    score -= (idle_seconds // 300) 
+
+                # Floor the score at 0
+                if score < 0:
+                    score = 0
+
+            # 5) Map score -> risk_level
+            if score >= 80:
+                risk = "low"
+            elif score >= 50:
+                risk = "medium"
+            else:
+                risk = "high"
+
+            # 6) Upsert into engagement_summary
+            cur.execute(
+                """
+                INSERT INTO engagement_summary(
+                    session_id, class_id, student_id,
+                    drowsy_count, awake_count, tab_away_count,
+                    idle_seconds, engagement_score, risk_level, created_at
+                )
+                VALUES (?,?,?,?,?,?,?,?,?,?)
+                ON CONFLICT(session_id, student_id)
+                DO UPDATE SET
+                  drowsy_count    = excluded.drowsy_count,
+                  awake_count     = excluded.awake_count,
+                  tab_away_count  = excluded.tab_away_count,
+                  idle_seconds    = excluded.idle_seconds,
+                  engagement_score= excluded.engagement_score,
+                  risk_level      = excluded.risk_level,
+                  created_at      = excluded.created_at
+                """,
+                (
+                    session_id, class_id, sid,
+                    drowsy_count, awake_count, tab_away_count,
+                    idle_seconds, score, risk, now_iso(),
+                ),
+            )
+
+            # 7) DROWSY / ENGAGEMENT ALERT
+            if lecturer_id:
+                notif_type = None
+                notif_level = None
+
+                if risk == "high":
+                    notif_type = "drowsy_alert"
+                    notif_level = "red"
+                elif risk == "medium" and (drowsy_count >= 10 or tab_away_count >= 15):
+                    notif_type = "drowsy_alert"
+                    notif_level = "yellow"
+
+                if notif_type:
+                    msg = (
+                        f"Student {sid} is at {risk} engagement risk "
+                        f"in {class_id} (session {session_id}): "
+                        f"drowsy {drowsy_count}×, tab away {tab_away_count}×."
                     )
-
+                    
+                    # Deduplicate notifications
                     cur.execute(
-                        """
-                        DELETE FROM notifications
-                        WHERE lecturer_id = ?
-                        AND type = ?
-                        AND message LIKE ?
-                        """,
-                        (lecturer_id, notif_type2,
-                        f"Student {sid} has low attendance in {class_id}%"),
+                        "DELETE FROM notifications WHERE lecturer_id=? AND type=? AND message LIKE ?",
+                        (lecturer_id, notif_type, f"Student {sid} is at %session {session_id}%")
                     )
-
                     cur.execute(
-                        """
-                        INSERT INTO notifications(lecturer_id, message, level, type)
-                        VALUES (?,?,?,?)
-                        """,
-                        (lecturer_id, msg2, notif_level2, notif_type2),
+                        "INSERT INTO notifications(lecturer_id, message, level, type) VALUES (?,?,?,?)",
+                        (lecturer_id, msg, notif_level, notif_type)
                     )
 
-        # === 9) CLASS-LEVEL ALERTS for the Alerts panel (table: alerts) ===
-        # One row per class + alert type, based on recent sessions.
-        if lecturer_id and class_id:
-            try:
-                # ---- 9a) Low engagement across sessions (Student low engagement)
-                # Look at last 5 sessions of this class and count how many are < 50% avg engagement.
-                eng_rows = cur.execute(
+            # 8) ATTENDANCE ALERT
+            if lecturer_id:
+                att_row = cur.execute(
                     """
                     SELECT
-                    es.session_id,
-                    AVG(es.engagement_score) AS avg_eng
-                    FROM engagement_summary es
-                    WHERE es.class_id = ?
-                    GROUP BY es.session_id
-                    ORDER BY es.session_id DESC
-                    LIMIT 5
+                    SUM(CASE WHEN a.status IN ('present', 'late') THEN 1 ELSE 0 END) AS present_count,
+                    SUM(CASE WHEN a.status='absent'  THEN 1 ELSE 0 END) AS absent_count
+                    FROM attendance a
+                    JOIN sessions s ON a.session_id = s.id
+                    WHERE s.class_id = ? AND a.student_id = ?
+                    """,
+                    (class_id, sid),
+                ).fetchone()
+
+                present_count = att_row["present_count"] or 0
+                absent_count  = att_row["absent_count"] or 0
+                total_sessions = present_count + absent_count
+
+                if total_sessions >= 3:
+                    attendance_rate = present_count * 100 / total_sessions
+                    notif_type2 = None
+                    notif_level2 = None
+
+                    if attendance_rate < 60:
+                        notif_type2 = "attendance_alert"
+                        notif_level2 = "red"
+                    elif attendance_rate < 80:
+                        notif_type2 = "attendance_alert"
+                        notif_level2 = "yellow"
+
+                    if notif_type2:
+                        msg2 = f"Student {sid} has low attendance in {class_id}: {attendance_rate:.0f}% over {total_sessions} sessions."
+                        
+                        cur.execute(
+                            "DELETE FROM notifications WHERE lecturer_id=? AND type=? AND message LIKE ?",
+                            (lecturer_id, notif_type2, f"Student {sid} has low attendance in {class_id}%")
+                        )
+                        cur.execute(
+                            "INSERT INTO notifications(lecturer_id, message, level, type) VALUES (?,?,?,?)",
+                            (lecturer_id, msg2, notif_level2, notif_type2)
+                        )
+
+        # 9) CLASS-LEVEL ALERTS (Outside student loop)
+        if lecturer_id and class_id:
+            try:
+                # 9a) Low engagement across sessions
+                eng_rows = cur.execute(
+                    """
+                    SELECT session_id, AVG(engagement_score) AS avg_eng
+                    FROM engagement_summary
+                    WHERE class_id = ?
+                    GROUP BY session_id
+                    ORDER BY session_id DESC LIMIT 5
                     """,
                     (class_id,),
                 ).fetchall()
 
                 low_sessions = 0
                 for r in eng_rows:
-                    avg_eng = r["avg_eng"] or 0.0
-                    if avg_eng < 50.0:
+                    if (r["avg_eng"] or 0.0) < 50.0:
                         low_sessions += 1
 
-                # First remove any old "Student low engagement" alert for this class
-                cur.execute(
-                    """
-                    DELETE FROM alerts
-                    WHERE lecturer_id = ? AND course = ? AND message = 'Student low engagement'
-                    """,
-                    (lecturer_id, class_id),
-                )
+                cur.execute("DELETE FROM alerts WHERE lecturer_id=? AND course=? AND message='Student low engagement'", (lecturer_id, class_id))
 
                 if low_sessions > 0:
-                    # 3 sessions below 50% -> High, otherwise Medium
-                    if low_sessions >= 3:
-                        level = "high"
-                    else:
-                        level = "medium"
-
-                    note_text = (
-                        f"{low_sessions} session below 50%"
-                        if low_sessions == 1
-                        else f"{low_sessions} sessions below 50%"
-                    )
-
+                    level = "high" if low_sessions >= 3 else "medium"
+                    note_text = f"{low_sessions} session below 50%" if low_sessions == 1 else f"{low_sessions} sessions below 50%"
+                    
                     cur.execute(
-                        """
-                        INSERT INTO alerts(lecturer_id, course, level, message, note, created_at)
-                        VALUES (?,?,?,?,?,?)
-                        """,
-                        (
-                            lecturer_id,
-                            class_id,
-                            level,
-                            "Student low engagement",
-                            note_text,
-                            now_iso(),
-                        ),
+                        "INSERT INTO alerts(lecturer_id, course, level, message, note, created_at) VALUES (?,?,?,?,?,?)",
+                        (lecturer_id, class_id, level, "Student low engagement", note_text, now_iso())
                     )
 
-                # ---- 9b) Attendance dropped alert (Attendance dropped)
-                # Compare last session attendance vs overall average for this class.
+                # 9b) Attendance dropped alert
                 last_row = cur.execute(
-                    """
-                    SELECT id
-                    FROM sessions
-                    WHERE class_id = ?
-                    ORDER BY start_ts DESC
-                    LIMIT 1
-                    """,
+                    "SELECT id FROM sessions WHERE class_id = ? ORDER BY start_ts DESC LIMIT 1",
                     (class_id,),
                 ).fetchone()
 
-                # Always remove any old "Attendance dropped" alert for this class first
-                cur.execute(
-                    """
-                    DELETE FROM alerts
-                    WHERE lecturer_id = ? AND course = ? AND message = 'Attendance dropped'
-                    """,
-                    (lecturer_id, class_id),
-                )
+                cur.execute("DELETE FROM alerts WHERE lecturer_id=? AND course=? AND message='Attendance dropped'", (lecturer_id, class_id))
 
                 if last_row:
                     last_session_id = last_row["id"]
-
+                    
+                    # Calc last session rate
                     last_att = cur.execute(
-                        """
-                        SELECT
-                        SUM(CASE WHEN status IN ('present','late') THEN 1 ELSE 0 END) AS present_cnt,
-                        COUNT(*) AS total_cnt
-                        FROM attendance
-                        WHERE session_id = ?
-                        """,
-                        (last_session_id,),
+                        "SELECT SUM(CASE WHEN status IN ('present','late') THEN 1 ELSE 0 END) as present_cnt, COUNT(*) as total_cnt FROM attendance WHERE session_id=?",
+                        (last_session_id,)
                     ).fetchone()
-
+                    
                     total_last = last_att["total_cnt"] or 0
                     present_last = last_att["present_cnt"] or 0
-
+                    
                     if total_last > 0:
                         last_rate = 100.0 * present_last / total_last
-
-                        # overall attendance across all sessions in this class
+                        
+                        # Calc overall rate
                         all_att = cur.execute(
-                            """
-                            SELECT
-                            SUM(CASE WHEN a.status='present' THEN 1 ELSE 0 END) AS present_cnt,
-                            COUNT(*) AS total_cnt
-                            FROM attendance a
-                            JOIN sessions s ON a.session_id = s.id
-                            WHERE s.class_id = ?
-                            """,
-                            (class_id,),
+                            "SELECT SUM(CASE WHEN a.status='present' THEN 1 ELSE 0 END) as present_cnt, COUNT(*) as total_cnt FROM attendance a JOIN sessions s ON a.session_id=s.id WHERE s.class_id=?",
+                            (class_id,)
                         ).fetchone()
-
+                        
                         total_all = all_att["total_cnt"] or 0
                         present_all = all_att["present_cnt"] or 0
-
-                        if total_all > 0:
-                            overall_rate = 100.0 * present_all / total_all
-                        else:
-                            overall_rate = last_rate
-
+                        overall_rate = (100.0 * present_all / total_all) if total_all > 0 else last_rate
+                        
                         drop = overall_rate - last_rate
 
-                        # Trigger an alert if last session < 80% and dropped ≥ 10 points
                         if last_rate < 80.0 and drop >= 10.0:
                             level2 = "medium" if last_rate >= 60.0 else "high"
                             note2 = f"Last session only {last_rate:.0f}%"
-
                             cur.execute(
-                                """
-                                INSERT INTO alerts(lecturer_id, course, level, message, note, created_at)
-                                VALUES (?,?,?,?,?,?)
-                                """,
-                                (
-                                    lecturer_id,
-                                    class_id,
-                                    level2,
-                                    "Attendance dropped",
-                                    note2,
-                                    now_iso(),
-                                ),
+                                "INSERT INTO alerts(lecturer_id, course, level, message, note, created_at) VALUES (?,?,?,?,?,?)",
+                                (lecturer_id, class_id, level2, "Attendance dropped", note2, now_iso())
                             )
-
             except Exception as e:
-                print("[alerts] failed to update alerts:", e, file=sys.stderr)
+                print(f"[alerts] failed to update alerts: {e}", file=sys.stderr)
 
-    conn.commit()
-    conn.close()
+        # Success - Commit the transaction
+        conn.commit()
+
+    except Exception as e:
+        # Optional: Print error or Log it
+        print(f"Error calculating engagement: {e}", file=sys.stderr)
+        # We generally do not want to raise here if this is running in a background job, 
+        # but you can remove the try/except wrapper if you want it to crash loudly.
+        
+    finally:
+        # FIX 1 (Continued): This guarantees the connection closes
+        conn.close()
 
 # -------------------- Helpers: Email Verification --------------------
 def get_serializer():
