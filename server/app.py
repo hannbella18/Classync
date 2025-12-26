@@ -2565,27 +2565,42 @@ def api_lecturer_courses():
 
     return jsonify({"ok": True, "courses": [dict(r) for r in rows]})
 
-
 @app.get("/api/lecturer/sessions")
 def api_lecturer_sessions():
+    """
+    API for the Analysis page dropdown.
+    PATCHED: Uses calculated 'Session 1, 2, 3' instead of Database IDs.
+    """
     if "user_id" not in session:
         return jsonify({"ok": False, "error": "not_logged_in"}), 401
 
     user_id = session["user_id"]
     course_id = (request.args.get("course_id") or "").strip()
 
-    conn = connect(); cur = conn.cursor()
+    conn = connect()
+    cur = conn.cursor()
 
-    # Only sessions for lecturer's classes; optionally filter by one course_id
+    # Build query parameters
     params = [user_id]
     where_course = ""
     if course_id:
         where_course = " AND s.class_id = ? "
         params.append(course_id)
 
-    rows = cur.execute(
+    # --- SQL CHANGE: Added ROW_NUMBER() with PARTITION ---
+    # PARTITION BY s.class_id ensures that if you fetch all courses,
+    # the numbering resets for each course (e.g. CS101 Session 1, CS102 Session 1)
+    cur.execute(
         f"""
-        SELECT s.id, s.class_id, s.start_ts, s.end_ts
+        SELECT 
+            s.id, 
+            s.class_id, 
+            s.start_ts, 
+            s.end_ts,
+            ROW_NUMBER() OVER (
+                PARTITION BY s.class_id 
+                ORDER BY s.start_ts ASC
+            ) as session_no
         FROM sessions s
         JOIN classes c ON c.id = s.class_id
         WHERE c.owner_user_id = ?
@@ -2594,16 +2609,39 @@ def api_lecturer_sessions():
         LIMIT 80
         """,
         tuple(params),
-    ).fetchall()
-
+    )
+    rows = cur.fetchall()
     conn.close()
 
-    # Use your existing label formatter (already in app.py)
     sessions_out = []
     default_session_id = None
+    
     for r in rows:
-        label = format_session_label(r)
-        is_open = r["end_ts"] is None
+        start_ts = r["start_ts"]
+        end_ts = r["end_ts"]
+        is_open = end_ts is None
+        
+        # 1. Get the calculated number
+        sess_num = r["session_no"]
+        
+        # 2. Format Date (Local Time)
+        try:
+            if isinstance(start_ts, str):
+                dt = datetime.fromisoformat(start_ts)
+            else:
+                dt = start_ts
+            
+            if dt.tzinfo is None:
+                dt = dt.replace(tzinfo=timezone.utc)
+            
+            dt_local = dt.astimezone(LOCAL_TZ)
+            pretty_date = dt_local.strftime("%Y-%m-%d %H:%M")
+        except Exception:
+            pretty_date = str(start_ts).replace("T", " ")[:16]
+
+        # 3. Create Label: "Session 1 – 2025-12-26"
+        label = f"Session {sess_num} – {pretty_date}"
+        
         if is_open:
             label += " (live)"
 
@@ -2613,8 +2651,8 @@ def api_lecturer_sessions():
                 "class_id": r["class_id"],
                 "label": label,
                 "is_open": is_open,
-                "start_ts": r["start_ts"],
-                "end_ts": r["end_ts"],
+                "start_ts": start_ts,
+                "end_ts": end_ts,
             }
         )
 
@@ -2623,7 +2661,11 @@ def api_lecturer_sessions():
         if is_open:
             default_session_id = r["id"]
 
-    return jsonify({"ok": True, "sessions": sessions_out, "default_session_id": default_session_id})
+    return jsonify({
+        "ok": True, 
+        "sessions": sessions_out, 
+        "default_session_id": default_session_id
+    })
 
 @app.get("/api/lecturer/analytics/kpis")
 def api_lecturer_kpis():
@@ -3512,9 +3554,15 @@ def api_summary_sessions(class_id):
         conn.close()
         return jsonify({"ok": False, "error": "class_not_found"}), 404
 
+    # --- CHANGED: SQL Query now calculates 'session_no' (1, 2, 3...) ---
     rows = cur.execute(
         """
-        SELECT id, name, start_ts, end_ts
+        SELECT 
+            id, 
+            name, 
+            start_ts, 
+            end_ts,
+            ROW_NUMBER() OVER (ORDER BY start_ts ASC) as session_no
         FROM sessions
         WHERE class_id = ?
         ORDER BY start_ts DESC
@@ -3530,16 +3578,37 @@ def api_summary_sessions(class_id):
         start_ts = r["start_ts"]
         end_ts = r["end_ts"]
         is_open = end_ts is None
+        
+        # --- CHANGED: Use the calculated number (1, 2, 3) instead of DB ID (45, 46) ---
+        sess_num = r["session_no"]
 
-        # ⭐ Use the correct local-time formatter
-        label = format_session_label(r)
+        # Format date (Copying logic from your format_session_label helper)
+        try:
+            # Check if start_ts is a string or datetime object
+            if isinstance(start_ts, str):
+                dt = datetime.fromisoformat(start_ts)
+            else:
+                dt = start_ts
+                
+            # If naive (no timezone), force UTC then convert
+            if dt.tzinfo is None:
+                dt = dt.replace(tzinfo=timezone.utc)
+                
+            dt_local = dt.astimezone(LOCAL_TZ)
+            pretty_date = dt_local.strftime("%Y-%m-%d %H:%M")
+        except Exception:
+            pretty_date = str(start_ts).replace("T", " ")[:16]
+
+        # The new clean label
+        label = f"Session {sess_num} – {pretty_date}"
+        
         if is_open:
             label += " (live)"
 
         sessions.append(
             {
                 "id": r["id"],
-                "label": label,
+                "label": label,  # Frontend displays this string
                 "start_ts": start_ts,
                 "end_ts": end_ts,
                 "is_open": is_open,
