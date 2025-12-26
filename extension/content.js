@@ -311,7 +311,23 @@ function createOverlay() {
   const title = document.createElement("div");
   title.style.fontWeight = "600";
   title.style.fontSize = "13px";
-  title.textContent = "Name / ID: ";
+  
+  // Create a clickable span for the label
+  const labelSpan = document.createElement("span");
+  labelSpan.textContent = "Name / ID: ";
+  labelSpan.style.cursor = "pointer";
+  labelSpan.title = "Click to reset Class ID";
+  
+  // Add click listener to reset ID
+  labelSpan.onclick = () => {
+      const newId = prompt("Enter new Class ID:", CURRENT_COURSE_ID || "");
+      if (newId && newId.trim() !== "") {
+          storageSetCourseId(newId.trim());
+          location.reload(); // Reload to apply the new ID
+      }
+  };
+  
+  title.appendChild(labelSpan);
 
   const nameSpan = document.createElement("span");
   nameSpan.id = "mm-name";
