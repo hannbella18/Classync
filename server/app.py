@@ -376,6 +376,18 @@ def compute_engagement_for_session(session_id):
         
         if not class_id:
             class_id = f"AUTO-{session_id}"
+        
+        # Calculate friendly Session Number (e.g., 1, 2, 3) by counting sessions for this class ordered by date
+        sess_num_row = cur.execute(
+            """
+            SELECT COUNT(*) as num 
+            FROM sessions 
+            WHERE class_id = ? 
+            AND start_ts <= (SELECT start_ts FROM sessions WHERE id = ?)
+            """, 
+            (class_id, session_id)
+        ).fetchone()
+        session_num = sess_num_row["num"] if sess_num_row else "?"
 
         # 1b) Find the lecturer (owner) for this class
         row_owner = cur.execute(
@@ -520,14 +532,14 @@ def compute_engagement_for_session(session_id):
                 if notif_type:
                     msg = (
                         f"Student {sid} is at {risk} engagement risk "
-                        f"in {class_id} (session {session_id}): "
+                        f"in {class_id} (session {session_num}): "
                         f"drowsy {drowsy_count}×, tab away {tab_away_count}×."
                     )
                     
                     # Deduplicate notifications
                     cur.execute(
                         "DELETE FROM notifications WHERE lecturer_id=? AND type=? AND message LIKE ?",
-                        (lecturer_id, notif_type, f"Student {sid} is at %session {session_id}%")
+                        (lecturer_id, notif_type, f"Student {sid} is at %session {session_num}%")
                     )
                     cur.execute(
                         "INSERT INTO notifications(lecturer_id, message, level, type) VALUES (?,?,?,?)",
