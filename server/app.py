@@ -1884,13 +1884,17 @@ def dashboard():
         (user_id,),
     ).fetchall()
 
-    # ----- Overall attendance summary (for donut) -----
+    # NEW CODE (Correct - gets only this lecturer's students):
     rows = cur.execute(
         """
-        SELECT status, COUNT(*) AS cnt
-        FROM attendance
-        GROUP BY status
-        """
+        SELECT a.status, COUNT(*) AS cnt
+        FROM attendance a
+        JOIN sessions s ON a.session_id = s.id
+        JOIN classes c ON s.class_id = c.id
+        WHERE c.owner_user_id = ?
+        GROUP BY a.status
+        """,
+        (user_id,)
     ).fetchall()
 
     attendance_data = {"present": 0, "absent": 0, "late": 0}
