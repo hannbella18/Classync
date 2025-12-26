@@ -2177,8 +2177,29 @@ def dashboard():
 # ===================== LECTURER – ANALYSIS SECTION =====================
 @app.route("/lecturer/analysis")
 def lecturer_analysis():
-    return render_template("lecturer_analysis.html")
+    if "user_id" not in session:
+        return redirect(url_for("login"))
+    
+    user_id = session["user_id"]
+    conn = connect()
+    cur = conn.cursor()
 
+    # ✅ FETCH NOTIFICATIONS (This was missing!)
+    notifications = cur.execute(
+        """
+        SELECT message, level, created_at
+        FROM notifications
+        WHERE lecturer_id = ?
+        ORDER BY created_at DESC
+        LIMIT 10
+        """,
+        (user_id,),
+    ).fetchall()
+
+    conn.close()
+
+    # ✅ Pass notifications to the template
+    return render_template("lecturer_analysis.html", notifications=notifications)
 
 # ===================== LECTURER – SETTINGS SECTION =====================
 @app.route("/lecturer/settings", methods=["GET", "POST"])
