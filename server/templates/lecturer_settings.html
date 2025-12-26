@@ -298,11 +298,6 @@
           <span class="notif-dot {{ n.level }}"></span>
 
           <div class="notif-main">
-            {% if n.type %}
-              <span class="notif-tag">
-                {{ n.type.replace('_', ' ')|title }}
-              </span>
-            {% endif %}
             <span class="notif-message">{{ n.message }}</span>
             <span class="notif-time">
               {{ n.created_at[11:16] if n.created_at }}
