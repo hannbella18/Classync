@@ -75,16 +75,26 @@
   opacity: 0.9;
 }
 
-/* ===== Student join link (3 horizontal lines) ===== */
+/* ===== Join link blocks (Student + Lecturer) ===== */
 
 .summary-join-row {
   margin-top: 1.25rem;
   padding-top: 1.25rem;
   border-top: 1px solid rgba(15, 23, 42, 0.08);
 
+  /* ✅ span full width across 3-column grid */
+  grid-column: 1 / -1;
+
   display: flex;
-  flex-direction: column;  /* 3 lines stacked */
+  flex-direction: column;
   gap: 0.5rem;
+}
+
+/* ✅ remove duplicate thick divider feel between the 2 join rows */
+.summary-join-row + .summary-join-row {
+  border-top: none;
+  padding-top: 0;
+  margin-top: 0.75rem;
 }
 
 /* LINE 1 */
@@ -94,14 +104,19 @@
   text-transform: uppercase;
   letter-spacing: 0.07em;
   color: #374151;
-  white-space: nowrap;      /* <-- keep on ONE line */
+
+  /* label stays one line */
+  white-space: nowrap;
 }
 
 /* LINE 2 */
 .summary-join-caption {
   font-size: 0.88rem;
   color: #6b7280;
-  white-space: nowrap;      /* <-- keep on ONE line */
+
+  /* ✅ allow wrap so it doesn't collide */
+  white-space: normal;
+  line-height: 1.35;
 }
 
 /* LINE 3 */
@@ -114,7 +129,7 @@
 .summary-join-input {
   flex: 1;
   min-width: 260px;
-  max-width: 450px;
+  max-width: 100%;
   padding: 0.5rem 0.9rem;
   border-radius: 999px;
   border: 1px solid #e5e7eb;
@@ -130,12 +145,8 @@
   padding: 0.55rem 1.2rem;
 }
 
-/* Allow wrapping on smaller screens so it doesn't overflow */
+/* ✅ Better wrapping on smaller screens */
 @media (max-width: 900px) {
-  .summary-join-caption {
-    white-space: normal;
-  }
-
   .summary-join-actions {
     flex-direction: column;
     align-items: flex-start;
@@ -144,6 +155,7 @@
 
   .summary-join-input {
     width: 100%;
+    min-width: 0;
     max-width: 100%;
   }
 }
@@ -289,7 +301,7 @@
 
 .summary-table th,
 .summary-table td {
-  white-space: normal;      /* allows long names to wrap */
+  white-space: normal;
   word-wrap: break-word;
 }
 
@@ -324,7 +336,6 @@
    Student Engagement – table
    ============================ */
 
-/* Slight hover on table rows */
 .summary-table tbody tr:hover {
   background: #f9fafb;
 }
@@ -453,7 +464,7 @@
 }
 
 /* Make behaviour lines slightly tighter and smaller */
-.summary-table td:nth-child(5) { /* 5th column = Behaviour in your table */
+.summary-table td:nth-child(5) {
   font-size: 0.85rem;
   line-height: 1.3;
 }
@@ -462,22 +473,15 @@
 .behaviour-cell {
   font-size: 0.85rem;
   line-height: 1.35;
-  color: #4b5563;          /* neutral gray */
-  white-space: normal;     /* allow wrapping */
+  color: #4b5563;
+  white-space: normal;
   vertical-align: middle;
-}
-
-/* When it's just "On track / Monitor / At risk" */
-.behaviour-cell:only-child,
-.behaviour-cell:not(:has(br)) {
-  font-weight: 500;
-  color: #16a34a;          /* green for good behaviour */
 }
 
 /* Style metric labels (Drowsy:, Tab away:, Idle:) */
 .behaviour-cell strong {
   font-weight: 600;
-  color: #1f2937;       /* darker gray */
+  color: #1f2937;
 }
 
 /* ===== Live roster status pills ===== */
