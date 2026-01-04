@@ -12,6 +12,9 @@ document.addEventListener("DOMContentLoaded", () => {
   const joinLinkInput = document.getElementById("joinLinkInput");
   const copyJoinLinkBtn = document.getElementById("copyJoinLinkBtn");
 
+  const lecturerJoinLinkInput = document.getElementById("lecturerJoinLinkInput");
+  const copyLecturerJoinLinkBtn = document.getElementById("copyLecturerJoinLinkBtn");
+
   // ===== Controls & table elements =====
   const sessionSelect = document.getElementById("sessionSelect");
   const refreshButtons = document.querySelectorAll(
@@ -644,6 +647,38 @@ document.addEventListener("DOMContentLoaded", () => {
         }, 1200);
       } catch (err) {
         console.error("[summary] copy join link error:", err);
+        alert("Failed to copy link. You can copy it manually:\n" + url);
+      }
+    });
+  }
+
+  // ----------------------------------------------------
+  // Copy lecturer join link button
+  // ----------------------------------------------------
+  if (lecturerJoinLinkInput && copyLecturerJoinLinkBtn) {
+    copyLecturerJoinLinkBtn.addEventListener("click", async () => {
+      const url = (lecturerJoinLinkInput.value || "").trim();
+      if (!url) return;
+
+      try {
+        if (navigator.clipboard && navigator.clipboard.writeText) {
+          await navigator.clipboard.writeText(url);
+        } else {
+          lecturerJoinLinkInput.select();
+          document.execCommand("copy");
+          lecturerJoinLinkInput.blur();
+        }
+
+        const original = copyLecturerJoinLinkBtn.textContent;
+        copyLecturerJoinLinkBtn.textContent = "Copied!";
+        copyLecturerJoinLinkBtn.disabled = true;
+
+        setTimeout(() => {
+          copyLecturerJoinLinkBtn.textContent = original;
+          copyLecturerJoinLinkBtn.disabled = false;
+        }, 1200);
+      } catch (err) {
+        console.error("[summary] copy lecturer join link error:", err);
         alert("Failed to copy link. You can copy it manually:\n" + url);
       }
     });

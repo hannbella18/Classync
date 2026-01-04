@@ -2462,7 +2462,7 @@ def summary():
     ).fetchall()
 
     row = cur.execute("""
-        SELECT id, name
+        SELECT id, name, platform_link
         FROM classes
         WHERE id = ?
     """, (class_id,)).fetchone()
@@ -2471,11 +2471,13 @@ def summary():
 
     class_code = row["id"] if row else "Unknown Class"
     class_name = row["name"] if row else ""
+    lecturer_join_link = row["platform_link"] if row and row["platform_link"] else ""
 
     return render_template(
         "summary.html",
         class_code=class_code,
         class_name=class_name,
+        lecturer_join_link=lecturer_join_link,
         notifications = notifications
     )
 

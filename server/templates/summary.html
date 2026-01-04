@@ -164,6 +164,35 @@
             </div>
           </div>
 
+          <!-- Lecturer join link row -->
+          <div class="summary-join-row">
+            <!-- Row 1 -->
+            <div class="summary-join-label">Lecturer join link</div>
+
+            <!-- Row 2 -->
+            <div class="summary-join-caption">
+              Google Meet link set by admin (read-only).
+            </div>
+
+            <!-- Row 3 -->
+            <div class="summary-join-actions">
+              <input
+                type="text"
+                id="lecturerJoinLinkInput"
+                class="summary-join-input"
+                value="{{ lecturer_join_link or '' }}"
+                readonly
+              />
+              <button
+                type="button"
+                class="btn-secondary summary-join-copy-btn"
+                id="copyLecturerJoinLinkBtn"
+                {% if not lecturer_join_link %}disabled{% endif %}
+              >
+                Copy link
+              </button>
+            </div>
+          </div>
         </div>
       </section>
 
