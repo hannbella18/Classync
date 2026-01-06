@@ -4,6 +4,9 @@ import sqlite3  # Imported to keep existing code happy!
 import psycopg2 # The new Supabase driver
 import psycopg2.extras
 from psycopg2 import Error as PgError, IntegrityError as PgIntegrityError
+import urllib.request
+import urllib.error
+
 
 # --- MAGIC TRICK: Map Postgres Errors to SQLite Errors ---
 # This fixes the "sqlite3 is not defined" errors
@@ -46,6 +49,12 @@ if not DB_URI:
 
 SECRET_KEY = os.getenv("SECRET_KEY", "dev-secret-change-this")
 SECURITY_PASSWORD_SALT = os.getenv("SECURITY_PASSWORD_SALT", "classync-reset-salt-change-this")
+
+SUPABASE_URL = (os.getenv("SUPABASE_URL") or "").strip()
+SUPABASE_ANON_KEY = (os.getenv("SUPABASE_ANON_KEY") or "").strip()
+
+if not SUPABASE_URL or not SUPABASE_ANON_KEY:
+    raise RuntimeError("SUPABASE_URL / SUPABASE_ANON_KEY not set. Add them in Hugging Face Secrets.")
 
 EMAIL_ADDRESS = os.environ.get("CLASSYNC_EMAIL_ADDRESS", "your_email@gmail.com")
 EMAIL_PASSWORD = os.environ.get("CLASSYNC_EMAIL_PASSWORD", "your-app-password")
@@ -257,6 +266,34 @@ def now_iso():
 
 def _now():
     return time.time()
+
+def supabase_auth_post(path: str, payload: dict):
+    url = f"{SUPABASE_URL}{path}"
+    data = json.dumps(payload).encode("utf-8")
+
+    req = urllib.request.Request(
+        url,
+        data=data,
+        method="POST",
+        headers={
+            "apikey": SUPABASE_ANON_KEY,
+            "Authorization": f"Bearer {SUPABASE_ANON_KEY}",
+            "Content-Type": "application/json",
+        },
+    )
+
+    try:
+        with urllib.request.urlopen(req, timeout=20) as resp:
+            body = resp.read().decode("utf-8") or "{}"
+            return resp.getcode(), json.loads(body)
+    except urllib.error.HTTPError as e:
+        try:
+            body = e.read().decode("utf-8") or "{}"
+            return e.code, json.loads(body)
+        except Exception:
+            return e.code, {"error": str(e)}
+    except Exception as e:
+        return 0, {"error": str(e)}
 
 def mint_next_student_id():
     conn = connect(); cur = conn.cursor()
@@ -796,12 +833,73 @@ def login():
         email = request.form.get("email", "").strip().lower()
         password = request.form.get("password", "")
 
-        print(f"--> LOGIN ATTEMPT: {email}") # Debug Print
+        print(f"--> LOGIN ATTEMPT: {email}")
 
+        # -----------------------------------------
+        # A) TRY SUPABASE AUTH FIRST (NEW)
+        # -----------------------------------------
+        status, data = supabase_auth_post(
+            "/auth/v1/token?grant_type=password",
+            {"email": email, "password": password},
+        )
+
+        if status == 200 and isinstance(data, dict) and data.get("access_token"):
+            print("--> SUPABASE AUTH OK")
+
+            # find this user in your app table (role/name/id)
+            conn = connect()
+            if not conn:
+                return render_template("login.html", error="Database connection failed")
+
+            cur = conn.cursor()
+            row = cur.execute(
+                """
+                SELECT id, name, email,
+                       COALESCE(role, 'lecturer') AS role
+                FROM users
+                WHERE lower(email)=?
+                """,
+                (email,),
+            ).fetchone()
+            conn.close()
+
+            if not row:
+                # Logged in on Supabase but no profile in your table
+                return render_template("login.html", error="Account not provisioned. Please contact admin.")
+
+            # Manual session
+            session["user_id"] = row["id"]
+            session["role"] = row["role"]
+
+            # Optional: store tokens if you ever need
+            session["sb_access_token"] = data.get("access_token")
+            session["sb_refresh_token"] = data.get("refresh_token")
+
+            # Flask-Login
+            user_obj = User(
+                id=row["id"],
+                name=row["name"],
+                email=row["email"],
+                role=row["role"]
+            )
+            login_user(user_obj)
+
+            # Redirect
+            if row["role"] == "admin":
+                return redirect(url_for("admin_dashboard"))
+            return redirect(url_for("dashboard"))
+
+        else:
+            # optional debug
+            print(f"--> SUPABASE AUTH FAIL: status={status}, resp={data}")
+
+        # -----------------------------------------
+        # B) FALLBACK TO LEGACY pw_hash (TEMP)
+        # -----------------------------------------
         conn = connect()
         if not conn:
             return render_template("login.html", error="Database connection failed")
-            
+
         cur = conn.cursor()
         row = cur.execute(
             """
@@ -815,34 +913,28 @@ def login():
         conn.close()
 
         if row:
-            print(f"--> USER FOUND: {row['email']} (Role: {row['role']})") # Debug Print
-            
+            print(f"--> USER FOUND: {row['email']} (Role: {row['role']})")
             if check_password_hash(row["pw_hash"], password):
-                print("--> PASSWORD MATCH! Logging in...") # Debug Print
-                
-                # 1. Manual Session (Keeps your existing code happy)
+                print("--> LEGACY PASSWORD MATCH! Logging in...")
+
                 session["user_id"] = row["id"]
                 session["role"] = row["role"]
-                
-                # 2. Flask-Login Session (Keeps the new User class happy)
-                # We create a temporary User object just to log them in
+
                 user_obj = User(
-                    id=row["id"], 
-                    name=row["name"], 
-                    email=row["email"], 
+                    id=row["id"],
+                    name=row["name"],
+                    email=row["email"],
                     role=row["role"]
                 )
-                login_user(user_obj) # <--- This is the magic key 🔑
+                login_user(user_obj)
 
-                # 3. Redirect
                 if row["role"] == "admin":
                     return redirect(url_for("admin_dashboard"))
-                else:
-                    return redirect(url_for("dashboard"))
-            else:
-                print("--> PASSWORD INCORRECT") # Debug Print
+                return redirect(url_for("dashboard"))
+
+            print("--> LEGACY PASSWORD INCORRECT")
         else:
-            print("--> USER NOT FOUND") # Debug Print
+            print("--> USER NOT FOUND")
 
         return render_template("login.html", error="Invalid email or password")
 
@@ -887,27 +979,27 @@ def forgot_password():
         email = (request.form.get("email") or "").strip().lower()
 
         if not email:
-            error = "Please enter your email."
-            return render_template("forgot_password.html", error=error)
+            return render_template("forgot_password.html", error="Please enter your email.")
 
+        # only send if email exists in your app table (optional)
         conn = connect(); cur = conn.cursor()
         row = cur.execute(
-            "SELECT id, email FROM users WHERE lower(email)=?",
+            "SELECT id FROM users WHERE lower(email)=?",
             (email,),
         ).fetchone()
         conn.close()
 
-        # We don't reveal whether email exists or not (security)
         if row:
-            s = get_serializer()
-            token = s.dumps(email, salt=SECURITY_PASSWORD_SALT)
-            reset_url = url_for("reset_password", token=token, _external=True)
-            send_reset_email(email, reset_url)
+            redirect_to = "https://hannbella-classync.hf.space/reset-password"
+            status, data = supabase_auth_post(
+                "/auth/v1/recover",
+                {"email": email, "redirect_to": redirect_to},
+            )
+            print("[SUPABASE RECOVER]", status, data)
 
         msg = "If that email exists in our system, a reset link has been sent."
         return render_template("forgot_password.html", message=msg)
 
-    # GET
     return render_template("forgot_password.html")
 
 @app.route("/reset-password/<token>", methods=["GET", "POST"])
@@ -953,6 +1045,14 @@ def reset_password(token):
 
     # GET
     return render_template("reset_password.html")
+
+@app.route("/reset-password", methods=["GET"])
+def reset_password_page():
+    return render_template(
+        "reset_password.html",
+        SUPABASE_URL=SUPABASE_URL,
+        SUPABASE_ANON_KEY=SUPABASE_ANON_KEY,
+    )
 
 @app.route("/logout")
 def logout():
