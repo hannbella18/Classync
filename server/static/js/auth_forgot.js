@@ -26,16 +26,26 @@
 
   const supabase = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
 
-  // 1) When user arrives from email link, exchange code for session
+  // 1) When user arrives from email link, establish session (supports both flows)
   (async () => {
+    // A) PKCE flow (?code=...)
     const params = new URLSearchParams(window.location.search);
     const code = params.get("code");
-
     if (code) {
       const { error } = await supabase.auth.exchangeCodeForSession(code);
-      if (error) {
-        showAlert("Reset link is invalid or expired. Please request again.", "error");
-      }
+      if (error) showAlert("Reset link is invalid or expired. Please request again.", "error");
+      return;
+    }
+
+    // B) Implicit flow (#access_token=...&refresh_token=...&type=recovery)
+    const hash = window.location.hash.startsWith("#") ? window.location.hash.slice(1) : "";
+    const hs = new URLSearchParams(hash);
+    const access_token = hs.get("access_token");
+    const refresh_token = hs.get("refresh_token");
+
+    if (access_token && refresh_token) {
+      const { error } = await supabase.auth.setSession({ access_token, refresh_token });
+      if (error) showAlert("Reset link is invalid or expired. Please request again.", "error");
     }
   })();
 
