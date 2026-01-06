@@ -1050,8 +1050,8 @@ def reset_password(token):
 def reset_password_page():
     return render_template(
         "reset_password.html",
-        SUPABASE_URL=SUPABASE_URL,
-        SUPABASE_ANON_KEY=SUPABASE_ANON_KEY,
+        SUPABASE_URL=os.getenv("SUPABASE_URL", ""),
+        SUPABASE_ANON_KEY=os.getenv("SUPABASE_ANON_KEY", ""),
     )
 
 @app.route("/logout")
