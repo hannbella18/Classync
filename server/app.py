@@ -2373,7 +2373,7 @@ def lecturer_change_password():
     new_pw = request.form.get("new_password", "")
     confirm_pw = request.form.get("confirm_password", "")
 
-    # Basic validation
+    # --- 1. Basic Validation ---
     if not current_pw or not new_pw or not confirm_pw:
         flash("Please fill in all password fields.", "error")
         return redirect(url_for("lecturer_settings"))
@@ -2386,22 +2386,66 @@ def lecturer_change_password():
         flash("New password must be at least 8 characters.", "error")
         return redirect(url_for("lecturer_settings"))
 
+    # --- 2. Verify Current Password (Local Check) ---
     conn = connect()
     cur = conn.cursor()
 
-    row = cur.execute("SELECT pw_hash FROM users WHERE id = ?", (user_id,)).fetchone()
+    row = cur.execute("SELECT id, email, pw_hash FROM users WHERE id = ?", (user_id,)).fetchone()
     if not row:
         conn.close()
         flash("User not found.", "error")
         return redirect(url_for("lecturer_settings"))
 
+    # We check the hash locally first to ensure they know their current password
     if not check_password_hash(row["pw_hash"], current_pw):
         conn.close()
         flash("Current password is incorrect.", "error")
         return redirect(url_for("lecturer_settings"))
 
-    new_hash = generate_password_hash(new_pw)  # uses werkzeug default (secure)
+    # --- 3. Update Password in Supabase (The Magic Step) ---
+    sb_token = session.get("sb_access_token")
 
+    if sb_token:
+        try:
+            url = f"{SUPABASE_URL}/auth/v1/user"
+            payload = json.dumps({"password": new_pw}).encode("utf-8")
+            
+            # We must use the USER'S token, not the Anon key, to update their own profile
+            req = urllib.request.Request(
+                url,
+                data=payload,
+                method="PUT",
+                headers={
+                    "apikey": SUPABASE_ANON_KEY,
+                    "Authorization": f"Bearer {sb_token}",
+                    "Content-Type": "application/json",
+                },
+            )
+            
+            with urllib.request.urlopen(req) as resp:
+                print(f"[Supabase] Password updated for {row['email']}")
+
+        except urllib.error.HTTPError as e:
+            # If the token expired (401), we can't update Supabase
+            print(f"[Supabase] Update failed: {e.code} {e.reason}")
+            conn.close()
+            
+            if e.code == 401:
+                flash("Your session has expired. Please log out and log in again to change your password.", "error")
+            else:
+                flash("Failed to update password in cloud system.", "error")
+            
+            return redirect(url_for("lecturer_settings"))
+            
+        except Exception as e:
+            print(f"[Supabase] Unexpected error: {e}")
+            conn.close()
+            flash("System error while updating password.", "error")
+            return redirect(url_for("lecturer_settings"))
+
+    # --- 4. Update Local DB (Keep in Sync) ---
+    # Only update local if Supabase succeeded (or if we skipped it because legacy login)
+    new_hash = generate_password_hash(new_pw)
     cur.execute("UPDATE users SET pw_hash = ? WHERE id = ?", (new_hash, user_id))
     conn.commit()
     conn.close()
