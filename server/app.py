@@ -836,46 +836,50 @@ def login():
         print(f"--> LOGIN ATTEMPT: {email}")
 
         # -----------------------------------------
-        # A) TRY SUPABASE AUTH FIRST (NEW)
+        # A) TRY SUPABASE AUTH FIRST
         # -----------------------------------------
         status, data = supabase_auth_post(
             "/auth/v1/token?grant_type=password",
             {"email": email, "password": password},
         )
 
+        # If Supabase says "YES", we trust it completely
         if status == 200 and isinstance(data, dict) and data.get("access_token"):
             print("--> SUPABASE AUTH OK")
 
-            # find this user in your app table (role/name/id)
             conn = connect()
             if not conn:
                 return render_template("login.html", error="Database connection failed")
-
+            
             cur = conn.cursor()
             row = cur.execute(
-                """
-                SELECT id, name, email,
-                       COALESCE(role, 'lecturer') AS role
-                FROM users
-                WHERE lower(email)=?
-                """,
+                "SELECT id, name, email, role FROM users WHERE lower(email)=?",
                 (email,),
             ).fetchone()
-            conn.close()
 
             if not row:
-                # Logged in on Supabase but no profile in your table
+                conn.close()
                 return render_template("login.html", error="Account not provisioned. Please contact admin.")
 
-            # Manual session
-            session["user_id"] = row["id"]
-            session["role"] = row["role"]
+            # --- FIX: SYNC LOCAL PASSWORD ---
+            # Supabase accepted this password, so we update our local hash to match.
+            # This fixes the "Current password incorrect" error after a reset.
+            try:
+                new_hash = generate_password_hash(password)
+                cur.execute("UPDATE users SET pw_hash=? WHERE id=?", (new_hash, row["id"]))
+                conn.commit()
+                print(f"--> LOCAL DB SYNCED for {email}")
+            except Exception as e:
+                print(f"--> SYNC ERROR: {e}")
 
-            # Optional: store tokens if you ever need
-            session["sb_access_token"] = data.get("access_token")
+            conn.close()
+
+            # Set session
+            session["user_id"] = row["id"]
+            session["role"] = row["role"] or "lecturer"
+            session["sb_access_token"] = data.get("access_token") # Save token for Change Password
             session["sb_refresh_token"] = data.get("refresh_token")
 
-            # Flask-Login
             user_obj = User(
                 id=row["id"],
                 name=row["name"],
@@ -884,14 +888,9 @@ def login():
             )
             login_user(user_obj)
 
-            # Redirect
             if row["role"] == "admin":
                 return redirect(url_for("admin_dashboard"))
             return redirect(url_for("dashboard"))
-
-        else:
-            # optional debug
-            print(f"--> SUPABASE AUTH FAIL: status={status}, resp={data}")
 
         # -----------------------------------------
         # B) FALLBACK TO LEGACY pw_hash (TEMP)
