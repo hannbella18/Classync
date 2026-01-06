@@ -2154,32 +2154,42 @@ def dashboard():
         )
         d_abs, dir_abs = _delta(abs_this, abs_last)
 
-        # 4) At-risk students (risk_level='high')
-        row_risk_this = cur.execute(
+        # 4) At-risk students (FIX: Attendance < 80%)
+        # New logic: Checks if (Present + Late) / Total Sessions < 0.8
+
+        # --- A. THIS WEEK (Recent 7 Days) ---
+        rows_risk_this = cur.execute(
             """
-            SELECT COUNT(DISTINCT es.student_id) AS cnt
-            FROM engagement_summary es
-            JOIN classes c ON es.class_id = c.id
+            SELECT student_id
+            FROM attendance a
+            JOIN sessions s ON a.session_id = s.id
+            JOIN classes c ON s.class_id = c.id
             WHERE c.owner_user_id = ?
-            AND es.risk_level = 'high'
-            AND es.created_at >= ?
+            AND s.start_ts >= ?
+            GROUP BY student_id
+            HAVING (SUM(CASE WHEN a.status IN ('present', 'late') THEN 1.0 ELSE 0.0 END) / COUNT(*)) < 0.8
             """,
             (user_id, this_start),
-        ).fetchone()
-        row_risk_last = cur.execute(
+        ).fetchall()
+        risk_this = len(rows_risk_this)
+
+        # --- B. LAST WEEK (Previous 7 Days) ---
+        rows_risk_last = cur.execute(
             """
-            SELECT COUNT(DISTINCT es.student_id) AS cnt
-            FROM engagement_summary es
-            JOIN classes c ON es.class_id = c.id
+            SELECT student_id
+            FROM attendance a
+            JOIN sessions s ON a.session_id = s.id
+            JOIN classes c ON s.class_id = c.id
             WHERE c.owner_user_id = ?
-            AND es.risk_level = 'high'
-            AND es.created_at >= ? AND es.created_at < ?
+            AND s.start_ts >= ? AND s.start_ts < ?
+            GROUP BY student_id
+            HAVING (SUM(CASE WHEN a.status IN ('present', 'late') THEN 1.0 ELSE 0.0 END) / COUNT(*)) < 0.8
             """,
             (user_id, last_start, this_start),
-        ).fetchone()
+        ).fetchall()
+        risk_last = len(rows_risk_last)
 
-        risk_this = float(row_risk_this["cnt"] or 0.0)
-        risk_last = float(row_risk_last["cnt"] or 0.0)
+        # Calculate the trend arrow
         d_risk, dir_risk = _delta(risk_this, risk_last)
 
         # Main values shown in big text (this week)
