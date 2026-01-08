@@ -2058,14 +2058,18 @@ def dashboard():
     # --- Average engagement by course (use engagement_summary) ---
     rows_ce = cur.execute(
         """
-        SELECT
-          es.class_id,
+        SELECT 
+          c.id AS class_id,
           c.name AS class_name,
-          AVG(es.engagement_score) AS avg_score
-        FROM engagement_summary es
-        JOIN classes c ON es.class_id = c.id
+          -- Calculate average of (Student Score OR 0 if null)
+          AVG(COALESCE(es.engagement_score, 0)) as strict_avg
+        FROM classes c
+        JOIN enrollments e ON c.id = e.class_id
+        LEFT JOIN engagement_summary es 
+               ON e.class_id = es.class_id 
+              AND e.student_id = es.student_id
         WHERE c.owner_user_id = ?
-        GROUP BY es.class_id, c.name, c.id
+        GROUP BY c.id, c.name
         ORDER BY c.id
         """,
         (user_id,),
