@@ -413,6 +413,29 @@ document.addEventListener("DOMContentLoaded", () => {
     });
   }
 
+  // ---- ALERTS CLEAR BUTTON LOGIC ----
+  const alertClearBtn = document.getElementById("alertClearBtn");
+  
+  if (alertClearBtn) {
+    alertClearBtn.addEventListener("click", () => {
+      // 1. Confirm with the user
+      if (!confirm("Are you sure you want to clear all active alerts?")) return;
+
+      // 2. Call the backend API
+      fetch("/api/alerts/clear", { method: "POST" })
+        .then((res) => res.json())
+        .then((data) => {
+          if (!data.ok) return;
+          
+          // 3. Reload the page to refresh the list
+          window.location.reload();
+        })
+        .catch((err) => {
+          console.error("Failed to clear alerts:", err);
+        });
+    });
+  }
+
 });
 
 /* ===== Interactive attendance donut (dummy data) ===== */

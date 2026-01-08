@@ -2337,6 +2337,22 @@ def dashboard():
         schedule_by_day=schedule_by_day
     )
 
+@app.post("/api/alerts/clear")
+def api_alerts_clear():
+    if "user_id" not in session:
+        return jsonify({"ok": False, "error": "not_logged_in"}), 401
+
+    user_id = session["user_id"]
+
+    conn = connect()
+    cur = conn.cursor()
+    # Delete all alerts for this lecturer
+    cur.execute("DELETE FROM alerts WHERE lecturer_id=?", (user_id,))
+    conn.commit()
+    conn.close()
+
+    return jsonify({"ok": True})
+
 # ===================== LECTURER – ANALYSIS SECTION =====================
 @app.route("/lecturer/analysis")
 def lecturer_analysis():

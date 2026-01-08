@@ -276,35 +276,27 @@
 
         <!-- Alerts – middle column, same row as Recent -->
         <section class="card alerts-card">
-          <header class="card-header alerts-header">
+          <header class="card-header alerts-header" style="display: flex; justify-content: space-between; align-items: center;">
+            
             <h2>Alerts</h2>
-            <span class="alerts-count">
-              {{ alerts|length }} active
-            </span>
+
+            <div style="display: flex; align-items: center; gap: 10px;">
+              
+              <span class="alerts-count">
+                {{ alerts|length }} active
+              </span>
+
+              {% if alerts|length > 0 %}
+              <button onclick="clearAlerts()" class="btn-text-danger" style="background: none; border: none; color: #dc3545; font-size: 0.85rem; cursor: pointer; text-decoration: underline;">
+                Clear All
+              </button>
+              {% endif %}
+              
+            </div>
           </header>
 
-          <ul class="alerts-list">
-            {% for a in alerts %}
-            <li class="alert-row alert-{{ a.level }}">
-              <div class="alert-dot"></div>
-
-              <div class="alert-main">
-                <div class="alert-top">
-                  <span class="alert-class">{{ a.course }}</span>
-                  <span class="alert-badge">{{ a.level|capitalize }}</span>
-                </div>
-
-                <p class="alert-text">
-                  {{ a.message }}
-                </p>
-
-                {% if a.note %}
-                <p class="alert-note">{{ a.note }}</p>
-                {% endif %}
-              </div>
-            </li>
-            {% endfor %}
-          </ul>
+          <ul class="alerts-list" style="max-height: 300px; overflow-y: auto; padding-right: 5px;">
+            </ul>
         </section>
 
         <!-- Overall Attendance – left column, bottom row -->
