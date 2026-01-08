@@ -64,6 +64,10 @@ SUPABASE_SERVICE_ROLE_KEY = os.getenv("SUPABASE_SERVICE_ROLE_KEY")
 # We use the Service Role Key here because the Anon Key cannot create users!
 supabase_admin: Client = create_client(SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY)
 
+# --- ADD THIS NEW CLIENT FOR PUBLIC SIGNUP ---
+# We use the ANON key because this is for public users signing themselves up
+supabase_anon: Client = create_client(SUPABASE_URL, SUPABASE_ANON_KEY)
+
 EMAIL_ADDRESS = os.environ.get("CLASSYNC_EMAIL_ADDRESS", "your_email@gmail.com")
 EMAIL_PASSWORD = os.environ.get("CLASSYNC_EMAIL_PASSWORD", "your-app-password")
 
@@ -949,37 +953,49 @@ def login():
 
 @app.route("/signup", methods=["GET", "POST"])
 def signup():
-    conn = connect(); cur = conn.cursor()
-    error = None
-    success = False
+    # Keep GET logic simple
+    if request.method == "GET":
+        return render_template("signup.html")
 
-    if request.method == "POST":
-        name = (request.form.get("name") or "").strip()
-        email = (request.form.get("email") or "").strip().lower()
-        password = request.form.get("password") or ""
+    # POST Logic
+    name = (request.form.get("name") or "").strip()
+    email = (request.form.get("email") or "").strip().lower()
+    password = request.form.get("password") or ""
 
-        university = "UPM"  # default because your DB requires it
+    if not (name and email and password):
+        return render_template("signup.html", error="Please fill in all required fields.")
 
-        if not (name and email and password):
-            error = "Please fill in all required fields."
-        else:
-            try:
-                pw_hash = generate_password_hash(password)
-                cur.execute(
-                    """
-                    INSERT INTO users(name, email, university, pw_hash, created_at, role)
-                    VALUES (?, ?, ?, ?, ?, ?)
-                    """,
-                    (name, email, university, pw_hash, now_iso(), "lecturer")
-                )
-                conn.commit()
-                success = True
-            except sqlite3.IntegrityError:
-                error = "Email already registered."
+    try:
+        # ---------------------------------------------------------
+        # THE FIX: Create user in Supabase Auth
+        # ---------------------------------------------------------
+        res = supabase_anon.auth.sign_up({
+            "email": email,
+            "password": password,
+            "options": {
+                "data": {
+                    "full_name": name,
+                    "role": "lecturer",   # <--- The SQL Trigger reads this!
+                    "university": "UPM"
+                }
+            }
+        })
 
-    conn.close()
-    return render_template("signup.html", error=error, success=success)
-
+        # If we get here without error, Supabase accepted it.
+        # The confirmation email is sent automatically by Supabase.
+        # Your SQL Trigger 'on_auth_user_created' will insert them into DB.
+        
+        return render_template("signup.html", success=True)
+             
+    except Exception as e:
+        # Handle Supabase errors (like "User already exists")
+        print(f"Signup Error: {e}")
+        error_msg = str(e)
+        if "already registered" in error_msg or "User already exists" in error_msg:
+            return render_template("signup.html", error="Email already registered.")
+        
+        return render_template("signup.html", error="Registration failed. Please try again.")
+    
 @app.route("/forgot-password", methods=["GET", "POST"])
 def forgot_password():
     if request.method == "POST":
