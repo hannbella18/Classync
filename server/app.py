@@ -2077,7 +2077,7 @@ def dashboard():
 
     course_engagement = []
     for r in rows_ce:
-        percent = int(round(r["avg_score"] or 0))
+        percent = int(round(r["strict_avg"] or 0))
         course_engagement.append(
             {
                 "id": r["class_id"],
