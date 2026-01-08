@@ -19,6 +19,7 @@ from collections import defaultdict
 from werkzeug.security import generate_password_hash, check_password_hash
 from email.message import EmailMessage
 from itsdangerous import URLSafeTimedSerializer, BadSignature, SignatureExpired
+from supabase import create_client, Client
 
 # Make ../ (project root that contains "vision/") importable first
 PARENT_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
@@ -55,6 +56,13 @@ SUPABASE_ANON_KEY = (os.getenv("SUPABASE_ANON_KEY") or "").strip()
 
 if not SUPABASE_URL or not SUPABASE_ANON_KEY:
     raise RuntimeError("SUPABASE_URL / SUPABASE_ANON_KEY not set. Add them in Hugging Face Secrets.")
+
+# --- Add this near your other config variables ---
+SUPABASE_SERVICE_ROLE_KEY = os.getenv("SUPABASE_SERVICE_ROLE_KEY")
+
+# Create a specific client for Admin actions
+# We use the Service Role Key here because the Anon Key cannot create users!
+supabase_admin: Client = create_client(SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY)
 
 EMAIL_ADDRESS = os.environ.get("CLASSYNC_EMAIL_ADDRESS", "your_email@gmail.com")
 EMAIL_PASSWORD = os.environ.get("CLASSYNC_EMAIL_PASSWORD", "your-app-password")
@@ -1521,17 +1529,21 @@ def admin_manage_users():
 
 @app.route("/admin/create-user", methods=["POST"])
 def admin_create_user():
-    # only admin
+    # 1. Security Check: Only allow Admins
     if "user_id" not in session or session.get("role") != "admin":
         return redirect(url_for("login"))
 
+    # 2. Get Form Data
     name     = (request.form.get("name") or "").strip()
     email    = (request.form.get("email") or "").strip().lower()
     role_raw = (request.form.get("role") or "lecturer").strip().lower()
     password = request.form.get("password") or ""
     dept_id  = request.form.get("department_id") or None
+    
+    # Normalize role
+    role = "admin" if role_raw == "admin" else "lecturer"
 
-    # hidden fields
+    # Hidden fields for Edit Mode
     is_edit       = (request.form.get("is_edit") or "").lower() == "yes"
     edit_user_id  = (request.form.get("edit_user_id") or "").strip()
 
@@ -1539,71 +1551,93 @@ def admin_create_user():
     conn.row_factory = sqlite3.Row
     cur = conn.cursor()
 
-    # normalise role text
-    role = "admin" if role_raw == "admin" else "lecturer"
-
-    # ========== EDIT EXISTING USER ==========
+    # =========================================================
+    # CASE A: EDIT EXISTING USER (Keep using SQL Update)
+    # =========================================================
     if is_edit and edit_user_id:
         try:
             user_id = int(edit_user_id)
-        except ValueError:
-            conn.close()
-            return redirect(url_for("admin_manage_users"))
+            
+            # If password is provided, we technically should update Auth too, 
+            # but for now, we just update the local DB reference or metadata.
+            # (To update Auth password, you need a separate supabase_admin.auth.admin.update_user_by_id call)
+            
+            query = """
+                UPDATE users
+                SET name = ?, email = ?, role = ?, dept_id = ?
+                WHERE id = ?
+            """
+            params = [name, email, role, dept_id, user_id]
 
-        if not (name and email):
-            conn.close()
-            return redirect(url_for("admin_manage_users"))
-
-        try:
-            # if password filled, update it; else keep old hash
+            # If you want to update the local pw_hash (optional backup)
             if password:
-                pw_hash = generate_password_hash(password)
-                cur.execute(
-                    """
+                new_hash = generate_password_hash(password)
+                query = """
                     UPDATE users
                     SET name = ?, email = ?, role = ?, dept_id = ?, pw_hash = ?
                     WHERE id = ?
-                    """,
-                    (name, email, role, dept_id, pw_hash, user_id),
-                )
-            else:
-                cur.execute(
-                    """
-                    UPDATE users
-                    SET name = ?, email = ?, role = ?, dept_id = ?
-                    WHERE id = ?
-                    """,
-                    (name, email, role, dept_id, user_id),
-                )
+                """
+                params = [name, email, role, dept_id, new_hash, user_id]
 
+            cur.execute(query, tuple(params))
             conn.commit()
-        except sqlite3.Error:
+            flash("User updated successfully.", "success")
+            
+        except Exception as e:
             conn.rollback()
+            flash(f"Error updating user: {str(e)}", "error")
         finally:
             conn.close()
 
         return redirect(url_for("admin_manage_users"))
 
-    # ========== CREATE NEW USER ==========
-    # require password when creating
+    # =========================================================
+    # CASE B: CREATE NEW USER (The New Logic!)
+    # =========================================================
+    
+    # Validate inputs
     if not (name and email and password):
         conn.close()
+        flash("Name, email, and password are required.", "error")
         return redirect(url_for("admin_manage_users"))
 
-    university = "UPM"  # keep consistent with signup()
-    pw_hash = generate_password_hash(password)
-
     try:
-        cur.execute(
-            """
-            INSERT INTO users (name, email, university, pw_hash, created_at, role, dept_id)
-            VALUES (?, ?, ?, ?, ?, ?, ?)
-            """,
-            (name, email, university, pw_hash, now_iso(), role, dept_id),
-        )
-        conn.commit()
-    except sqlite3.IntegrityError:
-        conn.rollback()
+        # ---------------------------------------------------------
+        # STEP 1: Create User in Supabase Auth
+        # ---------------------------------------------------------
+        # This call creates the user in the secure Auth system.
+        # The 'user_metadata' is crucial—it passes the role/name to the SQL Trigger.
+        user_attributes = {
+            "email": email,
+            "password": password,
+            "email_confirm": True, # Auto-confirm so they can login immediately
+            "user_metadata": {
+                "full_name": name,
+                "role": role,        # <--- Trigger reads this!
+                "university": "UPM",
+                "dept_id": dept_id
+            }
+        }
+        
+        # Call Supabase
+        response = supabase_admin.auth.admin.create_user(user_attributes)
+        
+        # If we get here, Supabase accepted the user.
+        # We DO NOT insert into SQL manually anymore. 
+        # The SQL Trigger 'on_auth_user_created' will handle the INSERT for us.
+        
+        flash(f"User {name} created successfully! (Role: {role})", "success")
+
+    except Exception as e:
+        # Catch Supabase errors (like "Email already registered")
+        error_msg = str(e)
+        print(f"Supabase Create Error: {error_msg}")
+        
+        if "already registered" in error_msg:
+             flash("That email is already registered.", "error")
+        else:
+             flash(f"Failed to create user: {error_msg}", "error")
+             
     finally:
         conn.close()
 
