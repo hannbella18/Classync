@@ -2061,234 +2061,254 @@ def dashboard():
         SELECT 
           c.id AS class_id,
           c.name AS class_name,
-          -- Calculate average of (Student Score OR 0 if null)
-          AVG(COALESCE(es.engagement_score, 0)) as strict_avg
+          e.student_id,
+          AVG(es.engagement_score) as avg_score
         FROM classes c
         JOIN enrollments e ON c.id = e.class_id
         LEFT JOIN engagement_summary es 
                ON e.class_id = es.class_id 
               AND e.student_id = es.student_id
         WHERE c.owner_user_id = ?
-        GROUP BY c.id, c.name
+        GROUP BY c.id, c.name, e.student_id
         ORDER BY c.id
         """,
         (user_id,),
     ).fetchall()
 
-    course_engagement = []
+    # --- Python Logic using rows_ce ---
+    from collections import defaultdict
+    class_map = {} 
+    class_scores = defaultdict(list)
+
+    # Loop through rows_ce
     for r in rows_ce:
-        percent = int(round(r["strict_avg"] or 0))
-        course_engagement.append(
-            {
-                "id": r["class_id"],
-                "name": r["class_name"],
-                "percent": percent,
-            }
-        )
+        cid = r["class_id"]
+        class_map[cid] = r["class_name"]
+        
+        # If avg_score is None (student never attended), treat as 0.0
+        val = float(r["avg_score"]) if r["avg_score"] is not None else 0.0
+        class_scores[cid].append(val)
+
+    course_engagement = []
+    for cid, scores_list in class_scores.items():
+        # Calculate Class Average
+        if len(scores_list) > 0:
+            final_avg = sum(scores_list) / len(scores_list)
+        else:
+            final_avg = 0.0
+            
+        course_engagement.append({
+            "id": cid,
+            "name": class_map[cid],
+            "percent": int(round(final_avg))
+        })
+
+    # Sort nicely
+    course_engagement.sort(key=lambda x: x["id"])
     
-        # ---- Engagement Overview KPIs + week-to-week trend ----
-        from datetime import datetime, timezone, timedelta
+    # ---- Engagement Overview KPIs + week-to-week trend ----
+    from datetime import datetime, timezone, timedelta
 
-        now = datetime.now(timezone.utc)
-        this_start = (now - timedelta(days=7)).isoformat()
-        last_start_dt = now - timedelta(days=14)
-        last_start = last_start_dt.isoformat()
-        last_end = this_start
+    now = datetime.now(timezone.utc)
+    this_start = (now - timedelta(days=7)).isoformat()
+    last_start_dt = now - timedelta(days=14)
+    last_start = last_start_dt.isoformat()
+    last_end = this_start
 
-        def _delta(curr, prev):
-            """Return (diff, direction: 'up'/'down'/'flat')."""
-            curr = float(curr or 0.0)
-            prev = float(prev or 0.0)
-            if prev == 0:
-                return 0.0, "flat"
-            diff = curr - prev
-            if diff > 0:
-                return diff, "up"
-            if diff < 0:
-                return diff, "down"
+    def _delta(curr, prev):
+        """Return (diff, direction: 'up'/'down'/'flat')."""
+        curr = float(curr or 0.0)
+        prev = float(prev or 0.0)
+        if prev == 0:
             return 0.0, "flat"
+        diff = curr - prev
+        if diff > 0:
+            return diff, "up"
+        if diff < 0:
+            return diff, "down"
+        return 0.0, "flat"
 
-        # 1) Avg engagement (this week vs last week)
-        row_this = cur.execute(
-            """
-            SELECT AVG(es.engagement_score) AS avg_eng
-            FROM engagement_summary es
-            JOIN classes c ON es.class_id = c.id
-            WHERE c.owner_user_id = ?
-            AND es.created_at >= ?
-            """,
-            (user_id, this_start),
-        ).fetchone()
-        row_last = cur.execute(
-            """
-            SELECT AVG(es.engagement_score) AS avg_eng
-            FROM engagement_summary es
-            JOIN classes c ON es.class_id = c.id
-            WHERE c.owner_user_id = ?
-            AND es.created_at >= ? AND es.created_at < ?
-            """,
-            (user_id, last_start, this_start),
-        ).fetchone()
+    # 1) Avg engagement (this week vs last week)
+    row_this = cur.execute(
+        """
+        SELECT AVG(es.engagement_score) AS avg_eng
+        FROM engagement_summary es
+        JOIN classes c ON es.class_id = c.id
+        WHERE c.owner_user_id = ?
+        AND es.created_at >= ?
+        """,
+        (user_id, this_start),
+    ).fetchone()
+    row_last = cur.execute(
+        """
+        SELECT AVG(es.engagement_score) AS avg_eng
+        FROM engagement_summary es
+        JOIN classes c ON es.class_id = c.id
+        WHERE c.owner_user_id = ?
+        AND es.created_at >= ? AND es.created_at < ?
+        """,
+        (user_id, last_start, this_start),
+    ).fetchone()
 
-        avg_this = float(row_this["avg_eng"] or 0.0)
-        avg_last = float(row_last["avg_eng"] or 0.0)
-        d_avg, dir_avg = _delta(avg_this, avg_last)
+    avg_this = float(row_this["avg_eng"] or 0.0)
+    avg_last = float(row_last["avg_eng"] or 0.0)
+    d_avg, dir_avg = _delta(avg_this, avg_last)
 
-        # 2) Camera on (% with at least one awake/drowsy event)
-        row_cam_this = cur.execute(
-            """
-            SELECT
-            SUM(CASE WHEN (es.awake_count + es.drowsy_count) > 0 THEN 1 ELSE 0 END) AS with_face,
-            COUNT(*) AS total_rows
-            FROM engagement_summary es
-            JOIN classes c ON es.class_id = c.id
-            WHERE c.owner_user_id = ?
-            AND es.created_at >= ?
-            """,
-            (user_id, this_start),
-        ).fetchone()
-        row_cam_last = cur.execute(
-            """
-            SELECT
-            SUM(CASE WHEN (es.awake_count + es.drowsy_count) > 0 THEN 1 ELSE 0 END) AS with_face,
-            COUNT(*) AS total_rows
-            FROM engagement_summary es
-            JOIN classes c ON es.class_id = c.id
-            WHERE c.owner_user_id = ?
-            AND es.created_at >= ? AND es.created_at < ?
-            """,
-            (user_id, last_start, this_start),
-        ).fetchone()
+    # 2) Camera on (% with at least one awake/drowsy event)
+    row_cam_this = cur.execute(
+        """
+        SELECT
+        SUM(CASE WHEN (es.awake_count + es.drowsy_count) > 0 THEN 1 ELSE 0 END) AS with_face,
+        COUNT(*) AS total_rows
+        FROM engagement_summary es
+        JOIN classes c ON es.class_id = c.id
+        WHERE c.owner_user_id = ?
+        AND es.created_at >= ?
+        """,
+        (user_id, this_start),
+    ).fetchone()
+    row_cam_last = cur.execute(
+        """
+        SELECT
+        SUM(CASE WHEN (es.awake_count + es.drowsy_count) > 0 THEN 1 ELSE 0 END) AS with_face,
+        COUNT(*) AS total_rows
+        FROM engagement_summary es
+        JOIN classes c ON es.class_id = c.id
+        WHERE c.owner_user_id = ?
+        AND es.created_at >= ? AND es.created_at < ?
+        """,
+        (user_id, last_start, this_start),
+    ).fetchone()
 
-        cam_this = (
-            100.0 * row_cam_this["with_face"] / row_cam_this["total_rows"]
-            if row_cam_this["total_rows"] else 0.0
-        )
-        cam_last = (
-            100.0 * row_cam_last["with_face"] / row_cam_last["total_rows"]
-            if row_cam_last["total_rows"] else 0.0
-        )
-        d_cam, dir_cam = _delta(cam_this, cam_last)
+    cam_this = (
+        100.0 * row_cam_this["with_face"] / row_cam_this["total_rows"]
+        if row_cam_this["total_rows"] else 0.0
+    )
+    cam_last = (
+        100.0 * row_cam_last["with_face"] / row_cam_last["total_rows"]
+        if row_cam_last["total_rows"] else 0.0
+    )
+    d_cam, dir_cam = _delta(cam_this, cam_last)
 
-        # 3) Absent rate (attendance, by sessions in last 7 days)
-        row_abs_this = cur.execute(
-            """
-            SELECT
-            SUM(CASE WHEN a.status='absent' THEN 1 ELSE 0 END) AS absent_cnt,
-            COUNT(*) AS total_cnt
-            FROM attendance a
-            JOIN sessions s ON a.session_id = s.id
-            JOIN classes  c ON s.class_id = c.id
-            WHERE c.owner_user_id = ?
-            AND s.start_ts >= ?
-            """,
-            (user_id, this_start),
-        ).fetchone()
-        row_abs_last = cur.execute(
-            """
-            SELECT
-            SUM(CASE WHEN a.status='absent' THEN 1 ELSE 0 END) AS absent_cnt,
-            COUNT(*) AS total_cnt
-            FROM attendance a
-            JOIN sessions s ON a.session_id = s.id
-            JOIN classes  c ON s.class_id = c.id
-            WHERE c.owner_user_id = ?
-            AND s.start_ts >= ? AND s.start_ts < ?
-            """,
-            (user_id, last_start, this_start),
-        ).fetchone()
+    # 3) Absent rate (attendance, by sessions in last 7 days)
+    row_abs_this = cur.execute(
+        """
+        SELECT
+        SUM(CASE WHEN a.status='absent' THEN 1 ELSE 0 END) AS absent_cnt,
+        COUNT(*) AS total_cnt
+        FROM attendance a
+        JOIN sessions s ON a.session_id = s.id
+        JOIN classes  c ON s.class_id = c.id
+        WHERE c.owner_user_id = ?
+        AND s.start_ts >= ?
+        """,
+        (user_id, this_start),
+    ).fetchone()
+    row_abs_last = cur.execute(
+        """
+        SELECT
+        SUM(CASE WHEN a.status='absent' THEN 1 ELSE 0 END) AS absent_cnt,
+        COUNT(*) AS total_cnt
+        FROM attendance a
+        JOIN sessions s ON a.session_id = s.id
+        JOIN classes  c ON s.class_id = c.id
+        WHERE c.owner_user_id = ?
+        AND s.start_ts >= ? AND s.start_ts < ?
+        """,
+        (user_id, last_start, this_start),
+    ).fetchone()
 
-        abs_this = (
-            100.0 * row_abs_this["absent_cnt"] / row_abs_this["total_cnt"]
-            if row_abs_this["total_cnt"] else 0.0
-        )
-        abs_last = (
-            100.0 * row_abs_last["absent_cnt"] / row_abs_last["total_cnt"]
-            if row_abs_last["total_cnt"] else 0.0
-        )
-        d_abs, dir_abs = _delta(abs_this, abs_last)
+    abs_this = (
+        100.0 * row_abs_this["absent_cnt"] / row_abs_this["total_cnt"]
+        if row_abs_this["total_cnt"] else 0.0
+    )
+    abs_last = (
+        100.0 * row_abs_last["absent_cnt"] / row_abs_last["total_cnt"]
+        if row_abs_last["total_cnt"] else 0.0
+    )
+    d_abs, dir_abs = _delta(abs_this, abs_last)
 
-        # 4) At-risk students (FIX: Attendance < 80%)
-        # New logic: Checks if (Present + Late) / Total Sessions < 0.8
+    # 4) At-risk students (FIX: Attendance < 80%)
+    # New logic: Checks if (Present + Late) / Total Sessions < 0.8
 
-        # --- A. THIS WEEK (Recent 7 Days) ---
-        rows_risk_this = cur.execute(
-            """
-            SELECT student_id
-            FROM attendance a
-            JOIN sessions s ON a.session_id = s.id
-            JOIN classes c ON s.class_id = c.id
-            WHERE c.owner_user_id = ?
-            AND s.start_ts >= ?
-            GROUP BY student_id
-            HAVING (SUM(CASE WHEN a.status IN ('present', 'late') THEN 1.0 ELSE 0.0 END) / COUNT(*)) < 0.8
-            """,
-            (user_id, this_start),
-        ).fetchall()
-        risk_this = len(rows_risk_this)
+    # --- A. THIS WEEK (Recent 7 Days) ---
+    rows_risk_this = cur.execute(
+        """
+        SELECT student_id
+        FROM attendance a
+        JOIN sessions s ON a.session_id = s.id
+        JOIN classes c ON s.class_id = c.id
+        WHERE c.owner_user_id = ?
+        AND s.start_ts >= ?
+        GROUP BY student_id
+        HAVING (SUM(CASE WHEN a.status IN ('present', 'late') THEN 1.0 ELSE 0.0 END) / COUNT(*)) < 0.8
+        """,
+        (user_id, this_start),
+    ).fetchall()
+    risk_this = len(rows_risk_this)
 
-        # --- B. LAST WEEK (Previous 7 Days) ---
-        rows_risk_last = cur.execute(
-            """
-            SELECT student_id
-            FROM attendance a
-            JOIN sessions s ON a.session_id = s.id
-            JOIN classes c ON s.class_id = c.id
-            WHERE c.owner_user_id = ?
-            AND s.start_ts >= ? AND s.start_ts < ?
-            GROUP BY student_id
-            HAVING (SUM(CASE WHEN a.status IN ('present', 'late') THEN 1.0 ELSE 0.0 END) / COUNT(*)) < 0.8
-            """,
-            (user_id, last_start, this_start),
-        ).fetchall()
-        risk_last = len(rows_risk_last)
+    # --- B. LAST WEEK (Previous 7 Days) ---
+    rows_risk_last = cur.execute(
+        """
+        SELECT student_id
+        FROM attendance a
+        JOIN sessions s ON a.session_id = s.id
+        JOIN classes c ON s.class_id = c.id
+        WHERE c.owner_user_id = ?
+        AND s.start_ts >= ? AND s.start_ts < ?
+        GROUP BY student_id
+        HAVING (SUM(CASE WHEN a.status IN ('present', 'late') THEN 1.0 ELSE 0.0 END) / COUNT(*)) < 0.8
+        """,
+        (user_id, last_start, this_start),
+    ).fetchall()
+    risk_last = len(rows_risk_last)
 
-        # Calculate the trend arrow
-        d_risk, dir_risk = _delta(risk_this, risk_last)
+    # Calculate the trend arrow
+    d_risk, dir_risk = _delta(risk_this, risk_last)
 
-        # Main values shown in big text (this week)
-        overview = {
-            "avg_engagement": int(round(avg_this)),
-            "camera_on": int(round(cam_this)),
-            "absent_rate": int(round(abs_this)),
-            "at_risk": int(round(risk_this)),
-        }
+    # Main values shown in big text (this week)
+    overview = {
+        "avg_engagement": int(round(avg_this)),
+        "camera_on": int(round(cam_this)),
+        "absent_rate": int(round(abs_this)),
+        "at_risk": int(round(risk_this)),
+    }
 
-        # Trend info just for the green/red text + arrow
-        trend = {
-            "avg": {
-                "dir": dir_avg,
-                "delta": round(d_avg, 1),
-                "text": (
-                    f"{d_avg:+.1f}% vs last week"
-                    if dir_avg != "flat" else "No change vs last week"
-                ),
-            },
-            "camera": {
-                "dir": dir_cam,
-                "delta": round(d_cam, 1),
-                "text": (
-                    f"{d_cam:+.1f}% vs last week"
-                    if dir_cam != "flat" else "No change vs last week"
-                ),
-            },
-            "absent": {
-                "dir": dir_abs,
-                "delta": round(d_abs, 1),
-                "text": (
-                    f"{d_abs:+.1f}% vs last week"
-                    if dir_abs != "flat" else "No change vs last week"
-                ),
-            },
-            "risk": {
-                "dir": dir_risk,
-                "delta": round(d_risk, 1),
-                "text": (
-                    f"{d_risk:+.1f} vs last week"
-                    if dir_risk != "flat" else "No change vs last week"
-                ),
-            },
-        }
+    # Trend info just for the green/red text + arrow
+    trend = {
+        "avg": {
+            "dir": dir_avg,
+            "delta": round(d_avg, 1),
+            "text": (
+                f"{d_avg:+.1f}% vs last week"
+                if dir_avg != "flat" else "No change vs last week"
+            ),
+        },
+        "camera": {
+            "dir": dir_cam,
+            "delta": round(d_cam, 1),
+            "text": (
+                f"{d_cam:+.1f}% vs last week"
+                if dir_cam != "flat" else "No change vs last week"
+            ),
+        },
+        "absent": {
+            "dir": dir_abs,
+            "delta": round(d_abs, 1),
+            "text": (
+                f"{d_abs:+.1f}% vs last week"
+                if dir_abs != "flat" else "No change vs last week"
+            ),
+        },
+        "risk": {
+            "dir": dir_risk,
+            "delta": round(d_risk, 1),
+            "text": (
+                f"{d_risk:+.1f} vs last week"
+                if dir_risk != "flat" else "No change vs last week"
+            ),
+        },
+    }
     
     # ----- Weekly schedule for calendar (from course_schedule) -----
     rows_sched = cur.execute(
