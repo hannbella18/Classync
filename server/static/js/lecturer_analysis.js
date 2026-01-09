@@ -45,11 +45,11 @@
   );
 
   // =========================
-  // Graph 5: Disengagement Cause Breakdown  ✅ (NEW)
+  // Graph 5: Daily Performance Trend 
   // =========================
-  const causeCanvas = document.getElementById("chartDisengagementCauses");
-  const causePlaceholder = document.querySelector(
-    '.chart-placeholder[data-for="chartDisengagementCauses"]'
+  const trendCanvas = document.getElementById("chartSessionTrend");
+  const trendPlaceholder = document.querySelector(
+    '.chart-placeholder[data-for="chartSessionTrend"]'
   );
 
   // =========================
@@ -65,7 +65,7 @@
   let chartEngagementStudent = null;
   let chartStateBreakdown = null;
   let chartRiskTimeline = null;
-  let chartDisengagementCauses = null;
+  let chartSessionTrend = null;  
   let chartRisk = null;
 
   let showAllStudents = false;
@@ -604,103 +604,97 @@
   }
 
   // =========================
-  // NEW: Disengagement Cause Breakdown ✅
+  // NEW: Daily Performance Trend
   // =========================
-  async function loadDisengagementCauseBreakdown(sessionId) {
-    if (!causeCanvas) return;
+  async function loadSessionTrend(sessionId) {
+    if (!trendCanvas) return;
 
     if (!sessionId) {
-      if (causePlaceholder) {
-        causePlaceholder.style.display = "block";
-        causePlaceholder.textContent = "No session selected / no sessions yet.";
+      if (trendPlaceholder) {
+        trendPlaceholder.style.display = "block";
+        trendPlaceholder.textContent = "No session selected / no sessions yet.";
       }
-      if (chartDisengagementCauses) {
-        chartDisengagementCauses.destroy();
-        chartDisengagementCauses = null;
+      if (chartSessionTrend) {
+        chartSessionTrend.destroy();
+        chartSessionTrend = null;
       }
       return;
     }
 
-    if (!ensureChartJs(causePlaceholder)) return;
+    if (!ensureChartJs(trendPlaceholder)) return;
 
-    if (causePlaceholder) {
-      causePlaceholder.style.display = "block";
-      causePlaceholder.textContent = "Loading chart...";
+    if (trendPlaceholder) {
+      trendPlaceholder.style.display = "block";
+      trendPlaceholder.textContent = "Loading chart...";
     }
 
+    // Call the NEW API
     const res = await fetch(
-      `/api/lecturer/analytics/disengagement_cause_breakdown?session_id=${encodeURIComponent(
-        sessionId
-      )}`,
+      `/api/lecturer/analytics/session_trend?session_id=${encodeURIComponent(sessionId)}`,
       { credentials: "include" }
     );
     const data = await res.json();
 
     if (!data.ok) {
-      console.warn("[Analysis] disengagement_cause_breakdown error:", data);
-      if (causePlaceholder) causePlaceholder.textContent = "Failed to load chart data.";
+      console.warn("[Analysis] session_trend error:", data);
+      if (trendPlaceholder) trendPlaceholder.textContent = "Failed to load chart data.";
       return;
     }
 
     const labels = data.labels || [];
-    const values = (data.values || []).map((v) => Number(v) || 0);
-    const pct = (data.percentages || []).map((v) => Number(v) || 0);
-    const total = values.reduce((a, b) => a + b, 0);
+    const values = data.values || [];
+    const colors = data.colors || [];
 
-    if (!labels.length || total === 0) {
-      if (causePlaceholder) {
-        causePlaceholder.style.display = "block";
-        causePlaceholder.textContent = "No disengagement events yet for this session.";
+    if (!labels.length) {
+      if (trendPlaceholder) {
+        trendPlaceholder.style.display = "block";
+        trendPlaceholder.textContent = "No past data available.";
       }
-      if (chartDisengagementCauses) {
-        chartDisengagementCauses.destroy();
-        chartDisengagementCauses = null;
+      if (chartSessionTrend) {
+        chartSessionTrend.destroy();
+        chartSessionTrend = null;
       }
       return;
     }
 
-    if (causePlaceholder) causePlaceholder.style.display = "none";
-    if (chartDisengagementCauses) chartDisengagementCauses.destroy();
+    if (trendPlaceholder) trendPlaceholder.style.display = "none";
+    if (chartSessionTrend) chartSessionTrend.destroy();
 
-    chartDisengagementCauses = new Chart(causeCanvas.getContext("2d"), {
+    // Render Vertical Bar Chart
+    chartSessionTrend = new Chart(trendCanvas.getContext("2d"), {
       type: "bar",
       data: {
-        labels,
-        datasets: [
-          {
-            label: "Disengagement events (count)",
+        labels: labels,
+        datasets: [{
+            label: "Daily Avg Score",
             data: values,
-          },
-        ],
+            backgroundColor: colors, // Dynamic colors (Red/Yellow/Green)
+            borderRadius: 6,
+            barPercentage: 0.6
+        }]
       },
       options: {
-        indexAxis: "y", // ✅ horizontal bars (more lecturer-friendly)
         responsive: true,
         maintainAspectRatio: false,
         plugins: {
-          legend: { display: false },
+          legend: { display: false }, // Colors explain themselves
           tooltip: {
             callbacks: {
-              label: (ctx) => {
-                const i = ctx.dataIndex;
-                const c = values[i] ?? 0;
-                const p = pct[i] ?? 0;
-                return ` ${c} events (${p}%)`;
-              },
-            },
-          },
+              label: (ctx) => ` Score: ${ctx.parsed.y}%`
+            }
+          }
         },
         scales: {
-          x: {
+          y: {
             beginAtZero: true,
-            ticks: { precision: 0 },
-            title: { display: true, text: "Count" },
-          },
-        },
-      },
+            max: 100,
+            title: { display: true, text: "Engagement (%)" }
+          }
+        }
+      }
     });
 
-    causeCanvas.style.opacity = "1";
+    trendCanvas.style.opacity = "1";
   }
 
   async function refreshAll() {
@@ -712,7 +706,7 @@
     await loadEngagementByStudent(sessionId);
     await loadStateBreakdown(sessionId);
     await loadRiskTimeline(sessionId);
-    await loadDisengagementCauseBreakdown(sessionId); // ✅ new
+    await loadSessionTrend(sessionId); 
     await loadRiskBreakdown(sessionId);
   }
 

@@ -3289,99 +3289,85 @@ def api_lecturer_engagement_extremes():
         "values": [int(r["engagement_score"] or 0) for r in rows]
     })
 
-@app.get("/api/lecturer/analytics/disengagement_cause_breakdown")
-def api_lecturer_disengagement_cause_breakdown():
+# ===================== NEW: Daily Performance Trend =====================
+@app.get("/api/lecturer/analytics/session_trend")
+def api_session_trend():
     if "user_id" not in session:
         return jsonify({"ok": False, "error": "not_logged_in"}), 401
 
-    user_id = session["user_id"]
-    session_id = request.args.get("session_id", type=int)
-    if not session_id:
+    # We need a session_id to identify the CLASS
+    current_session_id = request.args.get("session_id", type=int)
+    if not current_session_id:
         return jsonify({"ok": False, "error": "missing_session_id"}), 400
 
     conn = connect()
     cur = conn.cursor()
 
-    # Ownership check: make sure this session belongs to the lecturer's class
-    owns = cur.execute(
-        """
-        SELECT 1
-        FROM sessions s
-        JOIN classes c ON c.id = s.class_id
-        WHERE s.id = ? AND c.owner_user_id = ?
-        """,
-        (session_id, user_id),
-    ).fetchone()
-
-    if not owns:
+    # 1. Find class_id from the current session
+    row_cls = cur.execute("SELECT class_id FROM sessions WHERE id=?", (current_session_id,)).fetchone()
+    if not row_cls:
         conn.close()
-        return jsonify({"ok": False, "error": "forbidden"}), 403
+        return jsonify({"ok": False, "error": "session_not_found"}), 404
+    
+    class_id = row_cls["class_id"]
 
+    # 2. Get Daily Averages for the LAST 5 DAYS
+    #    We extract just the date part (YYYY-MM-DD) from start_ts
+    #    (Assumes start_ts is stored as ISO string in 'sessions' table)
     rows = cur.execute(
         """
-        SELECT type, value
-        FROM events
-        WHERE session_id = ?
-        ORDER BY ts ASC
+        SELECT 
+            SUBSTRING(s.start_ts, 1, 10) as session_date, 
+            AVG(es.engagement_score) as avg_score
+        FROM sessions s
+        JOIN engagement_summary es ON s.id = es.session_id
+        WHERE s.class_id = ?
+        GROUP BY session_date
+        ORDER BY session_date DESC
+        LIMIT 5
         """,
-        (session_id,),
+        (class_id,)
     ).fetchall()
 
     conn.close()
 
-    counts = {
-        "Drowsiness": 0,
-        "Tab switching": 0,
-        "Inactivity / Unknown": 0,
-        "Other": 0,
-    }
+    # 3. Reverse to show Oldest -> Newest (Left to Right)
+    rows.reverse()
 
-    import json as _json
+    labels = []
+    values = []
+    colors = []
+
+    from datetime import datetime
 
     for r in rows:
-        etype = (r["type"] or "").strip().lower()
-
-        # Parse JSON stored in value (your code stores a JSON dict there)
-        state = ""
+        # Format Date: "2025-12-24" -> "24 Dec"
+        date_str = r["session_date"] 
         try:
-            payload = _json.loads(r["value"]) if r["value"] else {}
-            state = (payload.get("state") or "").strip().lower()
-        except Exception:
-            state = ""
+            dt = datetime.strptime(date_str, "%Y-%m-%d")
+            pretty_date = dt.strftime("%d %b")
+        except:
+            pretty_date = date_str
+        
+        labels.append(pretty_date)
+        
+        # Value
+        score = int(round(r["avg_score"] or 0))
+        values.append(score)
 
-        # ---- Cause rules ----
-        if etype == "drowsy" or state == "drowsy":
-            counts["Drowsiness"] += 1
-            continue
-
-        if etype == "tab_away":
-            counts["Tab switching"] += 1
-            continue
-
-        # Your existing logic treats awake + Unknown as idle-ish → we classify as inactivity/unknown
-        if etype == "idle" or (etype == "awake" and (state == "unknown" or state == "")):
-            counts["Inactivity / Unknown"] += 1
-            continue
-
-        # Optional bucket (keeps chart stable even if new event types appear)
-        # If you prefer to ignore non-disengagement events like "awake"/"tab_back"/"sighting",
-        # you can comment this out.
-        if etype in ("tab_back", "awake", "sighting"):
-            continue
-
-        counts["Other"] += 1
-
-    labels = ["Drowsiness", "Tab switching", "Inactivity / Unknown", "Other"]
-    values = [counts[l] for l in labels]
-
-    total = sum(values) or 1
-    percentages = [round(v / total * 100.0, 1) for v in values]
+        # Dynamic Color
+        if score >= 75:
+            colors.append("#34d399") # Green
+        elif score >= 50:
+            colors.append("#fbbf24") # Yellow
+        else:
+            colors.append("#f87171") # Red
 
     return jsonify({
         "ok": True,
         "labels": labels,
         "values": values,
-        "percentages": percentages
+        "colors": colors
     })
 
 @app.get("/api/lecturer/analytics/risk_level_breakdown")
