@@ -526,7 +526,7 @@ def compute_engagement_for_session(session_id):
                 # FIX 2: Enable Idle Penalty
                 # Lose 1 point for every 60 seconds (5 minute) of idleness
                 if idle_seconds > 0:
-                    score -= (idle_seconds // 300) 
+                    score -= (idle_seconds // 300) * 2
 
                 # Floor the score at 0
                 if score < 0:
