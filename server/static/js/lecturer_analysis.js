@@ -13,11 +13,11 @@
   const kpiTab = document.getElementById("kpiTab");
 
   // =========================
-  // Graph 1: Engagement Over Time
+  // Graph 1: Attendance Drop-off (REPLACED Engagement Over Time)
   // =========================
-  const engTimeCanvas = document.getElementById("chartEngagementTime");
-  const engTimePlaceholder = document.querySelector(
-    '.chart-placeholder[data-for="chartEngagementTime"]'
+  const dropOffCanvas = document.getElementById("chartAttendanceDropOff");
+  const dropOffPlaceholder = document.querySelector(
+    '.chart-placeholder[data-for="chartAttendanceDropOff"]'
   );
 
   // =========================
@@ -61,7 +61,7 @@
   );
 
   // Chart refs
-  let chartEngagementTime = null;
+  let chartAttendanceDropOff = null;
   let chartEngagementStudent = null;
   let chartStateBreakdown = null;
   let chartRiskTimeline = null;
@@ -200,70 +200,108 @@
     setKpis(data.kpis);
   }
 
-  async function loadEngagementOverTime(sessionId) {
-    if (!engTimeCanvas) return;
+  async function loadAttendanceDropOff(sessionId) {
+    if (!dropOffCanvas) return;
 
     if (!sessionId) {
-      if (engTimePlaceholder) {
-        engTimePlaceholder.style.display = "block";
-        engTimePlaceholder.textContent = "No session selected / no sessions yet.";
+      if (dropOffPlaceholder) {
+        dropOffPlaceholder.style.display = "block";
+        dropOffPlaceholder.textContent = "No session selected.";
       }
-      if (chartEngagementTime) {
-        chartEngagementTime.destroy();
-        chartEngagementTime = null;
+      if (chartAttendanceDropOff) {
+        chartAttendanceDropOff.destroy();
+        chartAttendanceDropOff = null;
       }
       return;
     }
 
-    if (!ensureChartJs(engTimePlaceholder)) return;
+    if (!ensureChartJs(dropOffPlaceholder)) return;
 
-    if (engTimePlaceholder) {
-      engTimePlaceholder.style.display = "block";
-      engTimePlaceholder.textContent = "Loading chart...";
+    if (dropOffPlaceholder) {
+      dropOffPlaceholder.style.display = "block";
+      dropOffPlaceholder.textContent = "Loading chart...";
     }
 
     const res = await fetch(
-      `/api/lecturer/analytics/engagement_over_time?session_id=${encodeURIComponent(
-        sessionId
-      )}&bucket_s=60`,
+      `/api/lecturer/analytics/attendance_timeline?session_id=${encodeURIComponent(sessionId)}`,
       { credentials: "include" }
     );
     const data = await res.json();
 
     if (!data.ok) {
-      console.warn("[Analysis] engagement_over_time error:", data);
-      if (engTimePlaceholder) engTimePlaceholder.textContent = "Failed to load chart data.";
-      return;
+        if (dropOffPlaceholder) dropOffPlaceholder.textContent = "Failed to load.";
+        return;
     }
 
     const labels = data.labels || [];
-    const values = data.values || [];
+    const active = data.active || [];
+    const enrolled = data.enrolled || [];
 
     if (!labels.length) {
-      if (engTimePlaceholder) {
-        engTimePlaceholder.style.display = "block";
-        engTimePlaceholder.textContent = "No engagement events yet for this session.";
-      }
-      if (chartEngagementTime) {
-        chartEngagementTime.destroy();
-        chartEngagementTime = null;
-      }
-      return;
+       if (dropOffPlaceholder) {
+         dropOffPlaceholder.style.display = "block";
+         dropOffPlaceholder.textContent = "No data available.";
+       }
+       if (chartAttendanceDropOff) {
+         chartAttendanceDropOff.destroy();
+         chartAttendanceDropOff = null;
+       }
+       return;
     }
 
-    if (engTimePlaceholder) engTimePlaceholder.style.display = "none";
-    if (chartEngagementTime) chartEngagementTime.destroy();
+    if (dropOffPlaceholder) dropOffPlaceholder.style.display = "none";
+    if (chartAttendanceDropOff) chartAttendanceDropOff.destroy();
 
-    chartEngagementTime = new Chart(engTimeCanvas.getContext("2d"), {
+    // Render Dual Line Chart
+    chartAttendanceDropOff = new Chart(dropOffCanvas.getContext("2d"), {
       type: "line",
       data: {
-        labels,
-        datasets: [{ label: "Avg Engagement", data: values, tension: 0.25, pointRadius: 2 }],
+        labels: labels,
+        datasets: [
+          {
+            label: "Total Enrolled",
+            data: enrolled,
+            borderColor: "#94a3b8", // Gray
+            borderDash: [5, 5],     // Dotted Line
+            pointRadius: 0,
+            borderWidth: 2,
+            fill: false
+          },
+          {
+            label: "Active on Camera",
+            data: active,
+            borderColor: "#2563eb", // Blue
+            backgroundColor: "rgba(37, 99, 235, 0.1)",
+            pointRadius: 2,
+            tension: 0.3,
+            fill: true
+          }
+        ]
       },
-      options: { responsive: true, maintainAspectRatio: false },
+      options: {
+        responsive: true,
+        maintainAspectRatio: false,
+        scales: {
+          y: {
+            beginAtZero: true,
+            title: { display: true, text: "Students" },
+            suggestedMax: Math.max(...enrolled) + 2
+          },
+          x: {
+            title: { display: true, text: "Time" }
+          }
+        },
+        plugins: {
+            legend: { position: 'top' },
+            tooltip: {
+                mode: 'index',
+                intersect: false
+            }
+        }
+      }
     });
 
-    engTimeCanvas.style.opacity = "1";
+    dropOffCanvas.style.opacity = "1";
   }
 
   async function loadEngagementByStudent(sessionId) {
@@ -702,7 +740,7 @@
     console.log("[Analysis] refreshAll session:", sessionId);
 
     await loadKpis(sessionId);
-    await loadEngagementOverTime(sessionId);
+    await loadAttendanceDropOff(sessionId);
     await loadEngagementByStudent(sessionId);
     await loadStateBreakdown(sessionId);
     await loadRiskTimeline(sessionId);

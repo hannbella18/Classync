@@ -2997,28 +2997,26 @@ def api_lecturer_kpis():
         }
     })
 
-@app.get("/api/lecturer/analytics/engagement_over_time")
-def api_lecturer_engagement_over_time():
+# ===================== NEW: Attendance Drop-off Timeline =====================
+@app.get("/api/lecturer/analytics/attendance_timeline")
+def api_attendance_timeline():
     if "user_id" not in session:
         return jsonify({"ok": False, "error": "not_logged_in"}), 401
 
     user_id = session["user_id"]
+    session_id = request.args.get("session_id", type=int)
+    bucket_s = 60 # 1-minute buckets
 
-    session_id = (request.args.get("session_id") or "").strip()
-    if not session_id.isdigit():
+    if not session_id:
         return jsonify({"ok": False, "error": "missing_session_id"}), 400
-    session_id = int(session_id)
-
-    bucket_s = request.args.get("bucket_s", default=60, type=int)
-    if bucket_s < 10 or bucket_s > 600:
-        bucket_s = 60
 
     conn = connect()
     cur = conn.cursor()
 
-    owns = cur.execute(
+    # 1. Get Class ID & Check Ownership
+    row_sess = cur.execute(
         """
-        SELECT 1
+        SELECT s.class_id 
         FROM sessions s
         JOIN classes c ON c.id = s.class_id
         WHERE s.id = ? AND c.owner_user_id = ?
@@ -3026,78 +3024,60 @@ def api_lecturer_engagement_over_time():
         (session_id, user_id),
     ).fetchone()
 
-    if not owns:
+    if not row_sess:
         conn.close()
         return jsonify({"ok": False, "error": "forbidden"}), 403
 
+    class_id = row_sess["class_id"]
+
+    # 2. Get TOTAL Enrolled Students (The Benchmark Line)
+    row_count = cur.execute(
+        "SELECT COUNT(*) as cnt FROM enrollments WHERE class_id=?", 
+        (class_id,)
+    ).fetchone()
+    total_enrolled = row_count["cnt"] or 0
+
+    # 3. Get Active Students per Minute
     rows = cur.execute(
-        """
-        SELECT ts, value
-        FROM events
-        WHERE session_id = ?
-        ORDER BY ts ASC
-        """,
+        "SELECT ts, student_id FROM events WHERE session_id = ? ORDER BY ts ASC",
         (session_id,),
     ).fetchall()
-
+    
     conn.close()
 
-    buckets = defaultdict(list)
-
+    # Group by time bucket
+    buckets = defaultdict(set)
     for r in rows:
         ts_iso = r["ts"] or ""
         try:
             dt = datetime.fromisoformat(ts_iso.replace("Z", "+00:00"))
-        except Exception:
+            epoch = int(dt.timestamp())
+            bucket_epoch = (epoch // bucket_s) * bucket_s
+            if r["student_id"]:
+                buckets[bucket_epoch].add(r["student_id"])
+        except:
             continue
-
-        try:
-            v = json.loads(r["value"] or "{}")
-        except Exception:
-            v = {}
-
-        # ✅ Use state_score (real signal). Fallback to score if needed.
-        metric = v.get("state_score", None)
-        if metric is None:
-            metric = v.get("score", None)
-
-        try:
-            metric = float(metric)
-        except Exception:
-            continue
-
-        epoch = int(dt.timestamp())
-        bucket_epoch = (epoch // bucket_s) * bucket_s
-        buckets[bucket_epoch].append(metric)
 
     labels = []
-    values = []
-    myt = timezone(timedelta(hours=8))
+    active_values = []
+    enrolled_values = [] # Constant line
 
     sorted_keys = sorted(buckets.keys())
-    if not sorted_keys:
-        return jsonify({"ok": True, "bucket_s": bucket_s, "labels": [], "values": []})
-
-    base = sorted_keys[0]  # first bucket time (start reference)
-
-    for b in sorted_keys:
-        arr = buckets[b]
-        if not arr:
-            continue
-
-        avg = sum(arr) / len(arr)
-
-        # ✅ elapsed minutes from start
-        elapsed_min = int((b - base) / 60)
-        labels.append(f"+{elapsed_min} min")
-
-        values.append(round(avg, 2))
+    if sorted_keys:
+        base = sorted_keys[0]
+        for b in sorted_keys:
+            elapsed_min = int((b - base) / 60)
+            labels.append(f"{elapsed_min}m")
+            
+            # The Data
+            active_values.append(len(buckets[b]))
+            enrolled_values.append(total_enrolled)
 
     return jsonify({
         "ok": True,
-        "bucket_s": bucket_s,
         "labels": labels,
-        "values": values,
+        "active": active_values,
+        "enrolled": enrolled_values
     })
 
 @app.get("/api/lecturer/analytics/engagement_by_student")
