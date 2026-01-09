@@ -523,7 +523,6 @@
       riskTimelinePlaceholder.textContent = "Loading chart...";
     }
 
-    // Fetch data
     const res = await fetch(
       `/api/lecturer/analytics/engagement_over_time?session_id=${encodeURIComponent(
         sessionId
@@ -546,15 +545,12 @@
 
     const labels = data.labels || [];
     const engagement = (data.values || []).map((v) => Number(v) || 0);
-
-    // Calculate Risk (1 - Engagement)
     const riskScore = engagement.map((e) => Number((1 - e).toFixed(3)));
 
-    // ✅ REVERTED TO ORIGINAL THRESHOLDS
-    const T_LOW = 0.30; 
-    const T_MED = 0.45; 
+    const T_LOW = 0.30;
+    const T_MED = 0.45;
 
-    // ✅ VISUAL GUIDE PLUGIN (Colors + Text)
+    // ✅ PLUGIN: Only draws the BACKGROUND COLORS (Text removed)
     const riskBandsPlugin = {
       id: "riskBands",
       beforeDraw(chart) {
@@ -564,33 +560,22 @@
         const y = scales.y;
         const { left, width, top, bottom } = chartArea;
 
-        // Calculate Y pixel positions
         const yLow = y.getPixelForValue(T_LOW);
         const yMed = y.getPixelForValue(T_MED);
 
         ctx.save();
 
-        // 1. HIGH RISK ZONE (Red) - Top down to 0.45
+        // High Risk (Red Background)
         ctx.fillStyle = "rgba(239, 68, 68, 0.08)"; 
         ctx.fillRect(left, top, width, yMed - top);
-        
-        ctx.fillStyle = "#ef4444"; 
-        ctx.font = "bold 11px Poppins, sans-serif";
-        ctx.fillText("HIGH RISK (> 0.45)", left + 8, top + 15);
 
-        // 2. MEDIUM RISK ZONE (Yellow) - 0.45 down to 0.30
-        ctx.fillStyle = "rgba(245, 158, 11, 0.08)"; 
+        // Medium Risk (Yellow Background)
+        ctx.fillStyle = "rgba(245, 158, 11, 0.08)";
         ctx.fillRect(left, yMed, width, yLow - yMed);
 
-        ctx.fillStyle = "#f59e0b"; 
-        ctx.fillText("MEDIUM RISK", left + 8, yMed + 15);
-
-        // 3. LOW RISK ZONE (Green) - 0.30 down to Bottom
-        ctx.fillStyle = "rgba(34, 197, 94, 0.08)"; 
+        // Low Risk (Green Background)
+        ctx.fillStyle = "rgba(34, 197, 94, 0.08)";
         ctx.fillRect(left, yLow, width, bottom - yLow);
-
-        ctx.fillStyle = "#22c55e"; 
-        ctx.fillText("LOW RISK (<= 0.30)", left + 8, yLow + 15);
 
         ctx.restore();
       },
@@ -599,21 +584,49 @@
     if (riskTimelinePlaceholder) riskTimelinePlaceholder.style.display = "none";
     if (chartRiskTimeline) chartRiskTimeline.destroy();
 
-    // Render Chart
     chartRiskTimeline = new Chart(riskTimelineCanvas.getContext("2d"), {
       type: "line",
       data: {
         labels,
         datasets: [
+          // 1. The Real Data Line
           {
             label: "Risk Score",
             data: riskScore,
-            borderColor: "#3b82f6", // Blue Line
+            borderColor: "#3b82f6",
             backgroundColor: "rgba(59, 130, 246, 0.5)",
             tension: 0.3,
             pointRadius: 3,
             borderWidth: 2,
             fill: false,
+            order: 1 // Draw on top
+          },
+          // 2. Dummy Dataset for Legend: HIGH RISK
+          {
+            label: "High Risk (> 0.45)",
+            data: [], // Empty data so it doesn't draw
+            backgroundColor: "rgba(239, 68, 68, 0.6)", // Darker red for legend icon
+            borderColor: "rgba(239, 68, 68, 0.6)",
+            borderWidth: 1,
+            pointRadius: 0
+          },
+          // 3. Dummy Dataset for Legend: MEDIUM RISK
+          {
+            label: "Medium",
+            data: [],
+            backgroundColor: "rgba(245, 158, 11, 0.6)", // Darker yellow for legend icon
+            borderColor: "rgba(245, 158, 11, 0.6)",
+            borderWidth: 1,
+            pointRadius: 0
+          },
+          // 4. Dummy Dataset for Legend: LOW RISK
+          {
+            label: "Low Risk (<= 0.30)",
+            data: [],
+            backgroundColor: "rgba(34, 197, 94, 0.6)", // Darker green for legend icon
+            borderColor: "rgba(34, 197, 94, 0.6)",
+            borderWidth: 1,
+            pointRadius: 0
           }
         ],
       },
@@ -628,10 +641,23 @@
           },
         },
         plugins: {
-          legend: { display: false }, 
+          // ✅ ENABLE LEGEND (Shows the items we added above)
+          legend: { 
+            display: true,
+            position: 'top',
+            align: 'end',
+            labels: {
+                usePointStyle: true,
+                boxWidth: 8,
+                font: { size: 11 }
+            }
+          },
           tooltip: {
             callbacks: {
               label: (ctx) => {
+                // Only show tooltip for the real data line
+                if (ctx.dataset.data.length === 0) return null;
+                
                 const v = ctx.parsed.y;
                 let lvl = "Low";
                 if (v > T_MED) lvl = "High";
@@ -642,7 +668,7 @@
           },
         },
       },
-      plugins: [riskBandsPlugin], // Activate the visual guide
+      plugins: [riskBandsPlugin],
     });
 
     riskTimelineCanvas.style.opacity = "1";
