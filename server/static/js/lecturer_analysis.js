@@ -523,6 +523,7 @@
       riskTimelinePlaceholder.textContent = "Loading chart...";
     }
 
+    // Fetch data
     const res = await fetch(
       `/api/lecturer/analytics/engagement_over_time?session_id=${encodeURIComponent(
         sessionId
@@ -546,11 +547,14 @@
     const labels = data.labels || [];
     const engagement = (data.values || []).map((v) => Number(v) || 0);
 
+    // Calculate Risk (1 - Engagement)
     const riskScore = engagement.map((e) => Number((1 - e).toFixed(3)));
 
-    const T_LOW = 0.30;
-    const T_MED = 0.45;
+    // ✅ REVERTED TO ORIGINAL THRESHOLDS
+    const T_LOW = 0.30; 
+    const T_MED = 0.45; 
 
+    // ✅ VISUAL GUIDE PLUGIN (Colors + Text)
     const riskBandsPlugin = {
       id: "riskBands",
       beforeDraw(chart) {
@@ -558,21 +562,35 @@
         if (!chartArea) return;
 
         const y = scales.y;
-        const { left, right, top, bottom } = chartArea;
+        const { left, width, top, bottom } = chartArea;
 
+        // Calculate Y pixel positions
         const yLow = y.getPixelForValue(T_LOW);
         const yMed = y.getPixelForValue(T_MED);
 
         ctx.save();
 
-        ctx.fillStyle = "rgba(239, 68, 68, 0.12)";
-        ctx.fillRect(left, top, right - left, yMed - top);
+        // 1. HIGH RISK ZONE (Red) - Top down to 0.45
+        ctx.fillStyle = "rgba(239, 68, 68, 0.08)"; 
+        ctx.fillRect(left, top, width, yMed - top);
+        
+        ctx.fillStyle = "#ef4444"; 
+        ctx.font = "bold 11px Poppins, sans-serif";
+        ctx.fillText("HIGH RISK (> 0.45)", left + 8, top + 15);
 
-        ctx.fillStyle = "rgba(245, 158, 11, 0.12)";
-        ctx.fillRect(left, yMed, right - left, yLow - yMed);
+        // 2. MEDIUM RISK ZONE (Yellow) - 0.45 down to 0.30
+        ctx.fillStyle = "rgba(245, 158, 11, 0.08)"; 
+        ctx.fillRect(left, yMed, width, yLow - yMed);
 
-        ctx.fillStyle = "rgba(34, 197, 94, 0.10)";
-        ctx.fillRect(left, yLow, right - left, bottom - yLow);
+        ctx.fillStyle = "#f59e0b"; 
+        ctx.fillText("MEDIUM RISK", left + 8, yMed + 15);
+
+        // 3. LOW RISK ZONE (Green) - 0.30 down to Bottom
+        ctx.fillStyle = "rgba(34, 197, 94, 0.08)"; 
+        ctx.fillRect(left, yLow, width, bottom - yLow);
+
+        ctx.fillStyle = "#22c55e"; 
+        ctx.fillText("LOW RISK (<= 0.30)", left + 8, yLow + 15);
 
         ctx.restore();
       },
@@ -581,33 +599,22 @@
     if (riskTimelinePlaceholder) riskTimelinePlaceholder.style.display = "none";
     if (chartRiskTimeline) chartRiskTimeline.destroy();
 
+    // Render Chart
     chartRiskTimeline = new Chart(riskTimelineCanvas.getContext("2d"), {
       type: "line",
       data: {
         labels,
         datasets: [
           {
-            label: "Risk Score (1 - Engagement)",
+            label: "Risk Score",
             data: riskScore,
-            tension: 0.25,
-            pointRadius: 2,
+            borderColor: "#3b82f6", // Blue Line
+            backgroundColor: "rgba(59, 130, 246, 0.5)",
+            tension: 0.3,
+            pointRadius: 3,
             borderWidth: 2,
             fill: false,
-          },
-          {
-            label: "Low/Medium Threshold",
-            data: new Array(labels.length).fill(T_LOW),
-            borderDash: [6, 6],
-            pointRadius: 0,
-            borderWidth: 1.5,
-          },
-          {
-            label: "Medium/High Threshold",
-            data: new Array(labels.length).fill(T_MED),
-            borderDash: [6, 6],
-            pointRadius: 0,
-            borderWidth: 1.5,
-          },
+          }
         ],
       },
       options: {
@@ -617,11 +624,11 @@
           y: {
             min: 0,
             max: 1,
-            title: { display: true, text: "Risk Score" },
+            title: { display: true, text: "Risk (0.0 - 1.0)" },
           },
         },
         plugins: {
-          legend: { position: "top" },
+          legend: { display: false }, 
           tooltip: {
             callbacks: {
               label: (ctx) => {
@@ -629,13 +636,13 @@
                 let lvl = "Low";
                 if (v > T_MED) lvl = "High";
                 else if (v > T_LOW) lvl = "Medium";
-                return `${ctx.dataset.label}: ${v.toFixed(2)} (${lvl} risk)`;
+                return `Risk: ${v.toFixed(2)} (${lvl})`;
               },
             },
           },
         },
       },
-      plugins: [riskBandsPlugin],
+      plugins: [riskBandsPlugin], // Activate the visual guide
     });
 
     riskTimelineCanvas.style.opacity = "1";
