@@ -3080,6 +3080,109 @@ def api_attendance_timeline():
         "enrolled": enrolled_values
     })
 
+@app.get("/api/lecturer/analytics/engagement_over_time")
+def api_lecturer_engagement_over_time():
+    if "user_id" not in session:
+        return jsonify({"ok": False, "error": "not_logged_in"}), 401
+
+    user_id = session["user_id"]
+
+    session_id = (request.args.get("session_id") or "").strip()
+    if not session_id.isdigit():
+        return jsonify({"ok": False, "error": "missing_session_id"}), 400
+    session_id = int(session_id)
+
+    bucket_s = request.args.get("bucket_s", default=60, type=int)
+    if bucket_s < 10 or bucket_s > 600:
+        bucket_s = 60
+
+    conn = connect()
+    cur = conn.cursor()
+
+    # Check ownership
+    owns = cur.execute(
+        """
+        SELECT 1
+        FROM sessions s
+        JOIN classes c ON c.id = s.class_id
+        WHERE s.id = ? AND c.owner_user_id = ?
+        """,
+        (session_id, user_id),
+    ).fetchone()
+
+    if not owns:
+        conn.close()
+        return jsonify({"ok": False, "error": "forbidden"}), 403
+
+    # Get events
+    rows = cur.execute(
+        """
+        SELECT ts, value
+        FROM events
+        WHERE session_id = ?
+        ORDER BY ts ASC
+        """,
+        (session_id,),
+    ).fetchall()
+
+    conn.close()
+
+    buckets = defaultdict(list)
+
+    for r in rows:
+        ts_iso = r["ts"] or ""
+        try:
+            dt = datetime.fromisoformat(ts_iso.replace("Z", "+00:00"))
+        except Exception:
+            continue
+
+        try:
+            v = json.loads(r["value"] or "{}")
+        except Exception:
+            v = {}
+
+        # Use state_score or score
+        metric = v.get("state_score", None)
+        if metric is None:
+            metric = v.get("score", None)
+
+        try:
+            metric = float(metric)
+        except Exception:
+            continue
+
+        epoch = int(dt.timestamp())
+        bucket_epoch = (epoch // bucket_s) * bucket_s
+        buckets[bucket_epoch].append(metric)
+
+    labels = []
+    values = []
+    
+    sorted_keys = sorted(buckets.keys())
+    if not sorted_keys:
+        return jsonify({"ok": True, "bucket_s": bucket_s, "labels": [], "values": []})
+
+    base = sorted_keys[0]
+
+    for b in sorted_keys:
+        arr = buckets[b]
+        if not arr:
+            continue
+
+        avg = sum(arr) / len(arr)
+
+        # Elapsed minutes from start
+        elapsed_min = int((b - base) / 60)
+        labels.append(f"+{elapsed_min} min")
+        values.append(round(avg, 2))
+
+    return jsonify({
+        "ok": True,
+        "bucket_s": bucket_s,
+        "labels": labels,
+        "values": values,
+    })
+
 @app.get("/api/lecturer/analytics/engagement_by_student")
 def api_lecturer_engagement_by_student():
     if "user_id" not in session:
