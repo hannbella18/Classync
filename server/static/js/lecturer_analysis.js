@@ -490,7 +490,7 @@
 
       chartRisk = new Chart(riskCanvas.getContext("2d"), {
         type: "doughnut",
-        data: { labels, datasets: [{ data: values }] },
+        data: { labels, datasets: [{ data: values, backgroundColor: ["#34d399", "#fbbf24", "#f87171"] }] },
         options: { responsive: true, maintainAspectRatio: false },
       });
 
