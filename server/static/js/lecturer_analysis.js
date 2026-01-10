@@ -685,7 +685,7 @@
       trendPlaceholder.textContent = "Loading chart...";
     }
 
-    // Call the NEW API
+    // Call the API
     const res = await fetch(
       `/api/lecturer/analytics/session_trend?session_id=${encodeURIComponent(sessionId)}`,
       { credentials: "include" }
@@ -725,7 +725,7 @@
         datasets: [{
             label: "Daily Avg Score",
             data: values,
-            backgroundColor: colors, // Dynamic colors (Red/Yellow/Green)
+            backgroundColor: colors, // Colors come from backend (Green/Yellow/Red)
             borderRadius: 6,
             barPercentage: 0.6
         }]
@@ -734,7 +734,27 @@
         responsive: true,
         maintainAspectRatio: false,
         plugins: {
-          legend: { display: false }, // Colors explain themselves
+          // ✅ ADDED LEGEND HERE
+          legend: { 
+            display: true,
+            position: 'top',
+            align: 'center',       // Center alignment
+            labels: {
+                usePointStyle: false, // Box shape (Rectangle)
+                boxWidth: 40,         // Wide box width
+                font: { size: 11 },
+                // Manually generate the 3 categories based on app.py logic
+                generateLabels: function(chart) {
+                    return [
+                        { text: "High (>= 75%)", fillStyle: "#34d399", strokeStyle: "#34d399", lineWidth: 0 },
+                        { text: "Moderate",      fillStyle: "#fbbf24", strokeStyle: "#fbbf24", lineWidth: 0 },
+                        { text: "Low (< 50%)",   fillStyle: "#f87171", strokeStyle: "#f87171", lineWidth: 0 }
+                    ];
+                }
+            },
+            // Prevent clicking the legend from hiding the bars (since it's a guide)
+            onClick: (e) => e.stopPropagation()
+          },
           tooltip: {
             callbacks: {
               label: (ctx) => ` Score: ${ctx.parsed.y}%`
