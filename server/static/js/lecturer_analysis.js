@@ -434,7 +434,20 @@
 
     chartStateBreakdown = new Chart(stateCanvas.getContext("2d"), {
       type: "doughnut",
-      data: { labels, datasets: [{ label: "Count", data: values }] },
+      data: { 
+          labels, 
+          datasets: [{ 
+              label: "Count", 
+              data: values,
+              // ✅ NEW: Blue Monochromatic Palette
+              backgroundColor: [
+                  "#0476A7", // Attentive (Primary Blue)
+                  "#7BC8FE", // Idle (Lightest)
+                  "#00507E", // Drowsy (Darkest)
+                  "#4C9ED2"  // Tab away (Medium)
+              ] 
+          }] 
+      },
       options: {
         responsive: true,
         maintainAspectRatio: false,
