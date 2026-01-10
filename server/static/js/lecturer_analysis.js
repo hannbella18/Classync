@@ -550,7 +550,7 @@
     const T_LOW = 0.30;
     const T_MED = 0.45;
 
-    // ✅ PLUGIN: Only draws the BACKGROUND COLORS (Text removed)
+    // Background Colors Plugin
     const riskBandsPlugin = {
       id: "riskBands",
       beforeDraw(chart) {
@@ -564,19 +564,14 @@
         const yMed = y.getPixelForValue(T_MED);
 
         ctx.save();
-
-        // High Risk (Red Background)
         ctx.fillStyle = "rgba(239, 68, 68, 0.08)"; 
         ctx.fillRect(left, top, width, yMed - top);
 
-        // Medium Risk (Yellow Background)
         ctx.fillStyle = "rgba(245, 158, 11, 0.08)";
         ctx.fillRect(left, yMed, width, yLow - yMed);
 
-        // Low Risk (Green Background)
         ctx.fillStyle = "rgba(34, 197, 94, 0.08)";
         ctx.fillRect(left, yLow, width, bottom - yLow);
-
         ctx.restore();
       },
     };
@@ -589,7 +584,6 @@
       data: {
         labels,
         datasets: [
-          // 1. The Real Data Line
           {
             label: "Risk Score",
             data: riskScore,
@@ -599,34 +593,29 @@
             pointRadius: 3,
             borderWidth: 2,
             fill: false,
-            order: 1 // Draw on top
+            order: 1
           },
-          // 2. Dummy Dataset for Legend: HIGH RISK
+          // Dummy Datasets for LEGEND (Long Rectangles)
           {
             label: "High Risk (> 0.45)",
-            data: [], // Empty data so it doesn't draw
-            backgroundColor: "rgba(239, 68, 68, 0.6)", // Darker red for legend icon
+            data: [],
+            backgroundColor: "rgba(239, 68, 68, 0.6)",
             borderColor: "rgba(239, 68, 68, 0.6)",
-            borderWidth: 1,
-            pointRadius: 0
+            borderWidth: 1
           },
-          // 3. Dummy Dataset for Legend: MEDIUM RISK
           {
             label: "Medium",
             data: [],
-            backgroundColor: "rgba(245, 158, 11, 0.6)", // Darker yellow for legend icon
+            backgroundColor: "rgba(245, 158, 11, 0.6)",
             borderColor: "rgba(245, 158, 11, 0.6)",
-            borderWidth: 1,
-            pointRadius: 0
+            borderWidth: 1
           },
-          // 4. Dummy Dataset for Legend: LOW RISK
           {
             label: "Low Risk (<= 0.30)",
             data: [],
-            backgroundColor: "rgba(34, 197, 94, 0.6)", // Darker green for legend icon
+            backgroundColor: "rgba(34, 197, 94, 0.6)",
             borderColor: "rgba(34, 197, 94, 0.6)",
-            borderWidth: 1,
-            pointRadius: 0
+            borderWidth: 1
           }
         ],
       },
@@ -641,23 +630,20 @@
           },
         },
         plugins: {
-          // ✅ ENABLE LEGEND (Shows the items we added above)
           legend: { 
             display: true,
             position: 'top',
-            align: 'end',
+            align: 'center',       // ✅ CENTERED
             labels: {
-                usePointStyle: true,
-                boxWidth: 8,
+                usePointStyle: false, // ✅ FALSE = Box/Rectangle (not circle)
+                boxWidth: 40,         // ✅ 40px = Long Rectangle (like above graph)
                 font: { size: 11 }
             }
           },
           tooltip: {
             callbacks: {
               label: (ctx) => {
-                // Only show tooltip for the real data line
                 if (ctx.dataset.data.length === 0) return null;
-                
                 const v = ctx.parsed.y;
                 let lvl = "Low";
                 if (v > T_MED) lvl = "High";
