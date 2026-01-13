@@ -726,6 +726,48 @@ def compute_engagement_for_session(session_id):
         # FIX 1 (Continued): This guarantees the connection closes
         conn.close()
 
+# -------------------- Helpers: Auto-absent (attendance) --------------------
+def auto_mark_absent_students(session_id):
+    """
+    Finds all students enrolled in the class who have NO attendance record 
+    for this session, and inserts them as 'absent'.
+    """
+    if not session_id:
+        return
+
+    conn = connect()
+    cur = conn.cursor()
+
+    try:
+        # 1. Get the class_id for this session
+        row = cur.execute("SELECT class_id FROM sessions WHERE id=%s", (session_id,)).fetchone()
+        if not row:
+            return
+        class_id = row["class_id"]
+
+        # 2. SQL Magic: Select enrolled students NOT IN the attendance table
+        #    and insert them directly as 'absent'.
+        #    This is much faster than looping in Python.
+        ts_now = now_iso()
+        
+        cur.execute("""
+            INSERT INTO attendance (session_id, student_id, status, first_seen_ts, last_seen_ts)
+            SELECT %s, e.student_id, 'absent', %s, %s
+            FROM enrollments e
+            WHERE e.class_id = %s
+            AND e.student_id NOT IN (
+                SELECT student_id FROM attendance WHERE session_id = %s
+            )
+        """, (session_id, ts_now, ts_now, class_id, session_id))
+
+        conn.commit()
+        print(f"[Auto-Absent] Marked missing students as absent for session {session_id}")
+
+    except Exception as e:
+        print(f"[Auto-Absent] Error: {e}")
+    finally:
+        conn.close()
+
 # -------------------- Helpers: Email Verification --------------------
 def get_serializer():
     return URLSafeTimedSerializer(app.config["SECRET_KEY"])
@@ -4606,6 +4648,9 @@ def api_session_stop():
     )
     conn.commit()
     conn.close()
+
+    # --- ADDED: Auto-mark Absentees ---
+    auto_mark_absent_students(sid)
 
     # NEW: aggregate raw events into engagement_summary
     try:
