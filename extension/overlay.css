@@ -33,3 +33,14 @@
   0%   { width: 0ch; }
   100% { width: 3ch; }
 }
+
+/* HIDE USER CONTROLS for full automation */
+#meet-monitor-overlay button {
+  display: none !important; 
+}
+
+/* Optional: Make the status card smaller/transparent since they don't need to interact with it */
+#meet-monitor-overlay .mm-card {
+  opacity: 0.8; /* Make it slightly see-through */
+  pointer-events: none; /* Make it "click-through" so it doesn't block the meeting */
+}
