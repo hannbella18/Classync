@@ -29,9 +29,6 @@
         <a href="{{ url_for('admin_dashboard') }}" class="admin-logo admin-logo-link">
           Classync
         </a>
-        <a href="{{ url_for('admin_dashboard') }}" style="margin-left: 20px; color: var(--primary); text-decoration: none; font-weight: 600; font-size: 0.9rem;">
-          &larr; Dashboard
-        </a>
       </div>
 
       <!-- CENTER: Dashboard text -->
@@ -63,6 +60,17 @@
 
     <!-- Main Content -->
     <main class="admin-main">
+      {% with messages = get_flashed_messages(with_categories=true) %}
+        {% if messages %}
+          <div class="flash-container">
+            {% for category, message in messages %}
+              <div class="flash flash-{{ category }}">
+                {{ message }}
+              </div>
+            {% endfor %}
+          </div>
+        {% endif %}
+      {% endwith %}
 
       <!-- Hero Section -->
       <section class="admin-hero">

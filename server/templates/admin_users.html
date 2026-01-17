@@ -37,7 +37,11 @@
       </div>
 
       <div class="admin-nav-center">
-        <div class="admin-nav-title">Users</div>
+        <div class="nav-breadcrumb">
+          <a href="{{ url_for('admin_dashboard') }}" class="breadcrumb-link">Dashboard</a>
+          <span class="breadcrumb-separator">/</span>
+          <span class="breadcrumb-current">Users</span>
+        </div>
       </div>
 
       <div class="admin-nav-right">
@@ -61,6 +65,17 @@
 
     <!-- MAIN -->
     <main class="admin-main">
+      {% with messages = get_flashed_messages(with_categories=true) %}
+        {% if messages %}
+          <div class="flash-container">
+            {% for category, message in messages %}
+              <div class="flash flash-{{ category }}">
+                {{ message }}
+              </div>
+            {% endfor %}
+          </div>
+        {% endif %}
+      {% endwith %}
 
       <!-- Header + Add button -->
       <section class="users-header">

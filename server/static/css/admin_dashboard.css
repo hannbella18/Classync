@@ -324,6 +324,68 @@ html, body {
 }
 
 /* =========================================================
+   NEW: BREADCRUMB NAVIGATION
+   ========================================================= */
+.nav-breadcrumb {
+  display: flex;
+  align-items: center;
+  gap: 10px; /* Space between items */
+  font-family: 'Poppins', sans-serif;
+}
+
+.breadcrumb-link {
+  color: #94a3b8; /* Soft Gray */
+  text-decoration: none;
+  font-size: 1.1rem;
+  font-weight: 500;
+  transition: color 0.2s;
+}
+
+.breadcrumb-link:hover {
+  color: #2563eb; /* Blue on hover */
+  text-decoration: underline;
+}
+
+.breadcrumb-separator {
+  color: #cbd5e1; /* Light gray slash */
+  font-size: 1.1rem;
+}
+
+.breadcrumb-current {
+  color: #1e293b; /* Dark Blue/Black */
+  font-weight: 600;
+  font-size: 1.1rem;
+}
+
+/* =========================================================
+   NEW: FLASH MESSAGES (Shared Style)
+   ========================================================= */
+.flash-container {
+  margin-bottom: 1rem;
+}
+
+.flash {
+  padding: 0.75rem 1rem;
+  border-radius: 12px;
+  font-size: 0.9rem;
+  font-weight: 500;
+  margin-bottom: 0.5rem;
+  animation: fadeIn 0.3s ease-out;
+}
+
+.flash-success {
+  background: #dcfce7;
+  color: #166534;
+  border: 1px solid #bbf7d0;
+}
+
+.flash-error {
+  background: #fee2e2;
+  color: #b91c1c;
+  border: 1px solid #fecaca;
+}
+
+/* =========================================================
    ANIMATIONS
 ========================================================= */
 
