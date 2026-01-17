@@ -66,7 +66,7 @@
 
         <div class="user-info">
           <div class="avatar">
-            {{ current_user.initials if current_user else 'CS' }}
+            {{ (current_user.name[0:1]|upper ~ (current_user.name.split(' ')[-1][0:1]|upper if current_user.name.split(' ')|length > 1 else "")) if current_user else "AD" }}
           </div>
           <div class="user-text">
             <div class="user-name">
