@@ -3019,12 +3019,15 @@ def api_lecturer_kpis():
 
     r = cur.execute("""
         SELECT
-          AVG(engagement_score) AS avg_eng,
+          AVG(es.engagement_score) AS avg_eng,
           COUNT(DISTINCT CASE WHEN a.status IN ('present', 'late') THEN es.student_id END) AS active_students,
-          SUM(drowsy_count) AS drowsy_total,
-          SUM(tab_away_count) AS tab_total
-        FROM engagement_summary
-        WHERE session_id = ?
+          SUM(es.drowsy_count) AS drowsy_total,
+          SUM(es.tab_away_count) AS tab_total
+        FROM engagement_summary es
+        LEFT JOIN attendance a 
+               ON es.session_id = a.session_id 
+              AND es.student_id = a.student_id
+        WHERE es.session_id = ?
     """, (session_id,)).fetchone()
 
     conn.close()
