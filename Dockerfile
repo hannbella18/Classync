@@ -26,4 +26,4 @@ EXPOSE 7860
 # 8. The Command to Start the Server
 # We use Gunicorn (Production Server) instead of "python app.py"
 # --worker-class eventlet is REQUIRED for SocketIO to work
-CMD ["gunicorn", "-k", "gthread", "--threads", "8", "-w", "1", "--timeout", "300", "-b", "0.0.0.0:7860", "server.app:app"]
+CMD ["gunicorn", "-k", "gthread", "--threads", "4", "-w", "1", "-b", "0.0.0.0:7860", "server.app:app"]
