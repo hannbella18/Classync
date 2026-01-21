@@ -2,10 +2,10 @@
 title: Classync
 emoji: 🎓
 colorFrom: blue
-colorTo: indigo
+colorTo: green
 sdk: docker
-app_port: 7869
 pinned: false
 ---
 
-# Classync Backend
+# Classync API Server
+This is the backend for the Classync Student Attendance System.
