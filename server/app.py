@@ -5183,9 +5183,11 @@ def api_identify():
     bbox_json = {"x": pint(x1), "y": pint(y1), "w": pint(w), "h": pint(h)}
 
     # ---------- 3) Basic quality checks ----------
-    MIN_FACE_W = 70
-    MIN_FACE_H = 70
+    MIN_FACE_W = 40
+    MIN_FACE_H = 40
     if w < MIN_FACE_W or h < MIN_FACE_H:
+        # Optional: Print why we failed so you can see it in logs
+        print(f"DEBUG: Face too small: {w}x{h}")
         return jsonify(
             {
                 "ok": True,
@@ -5198,7 +5200,7 @@ def api_identify():
         )
 
     face_gray = cv2.cvtColor(img[y1:y2, x1:x2], cv2.COLOR_BGR2GRAY)
-    if cv2.Laplacian(face_gray, cv2.CV_64F).var() < 30:
+    if cv2.Laplacian(face_gray, cv2.CV_64F).var() < 5:
         # too blurry
         return jsonify(
             {
