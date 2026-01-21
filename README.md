@@ -2,7 +2,7 @@
 title: Classync
 emoji: 🎓
 colorFrom: blue
-colorTo: cyan
+colorTo: indigo
 sdk: docker
 app_port: 5001
 pinned: false
